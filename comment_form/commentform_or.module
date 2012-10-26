@@ -1,0 +1,27 @@
+
+
+<?php
+
+/**
+* @file
+* Prevents the user from voting mupltiple times on a node
+*
+* Checks the tag for the current vote and deletes the rest from the database
+*/
+
+
+/**
+* Implementation of hook_form_alter ().
+*/
+
+function commentform_form_comment_form_alter(&$form, &$form_state, $form_id) {
+
+
+   $form['#theme'] = 'comment_form';
+}
+
+
+
+?>
+
+

@@ -1,0 +1,14 @@
+;$Id$
+
+name = Limit Votes
+description = Allows the user to vote only once per node.
+package = Voting
+core = 7.x
+
+files[] = limitvotes.module
+
+
+
+
+
+

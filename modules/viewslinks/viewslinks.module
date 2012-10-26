@@ -1,0 +1,80 @@
+
+
+<?php
+
+/**
+* @file
+* Removes the Views menu links from the menu if the views is empty
+*
+* 
+*/
+
+/**
+ * Implements hook_enable()
+ */
+function viewslinks_enable() 
+{
+    db_update('system')
+    ->fields(array('weight' => 1))
+    ->condition('type', 'module')
+    ->condition('name', 'viewslinks')
+    ->execute();
+}
+
+
+
+/**
+* Implementation of hook_embed_view().
+*/
+
+function viewslinks_embed_view($name, $display_id = 'default') 
+{
+
+
+  // handle any add'l args (this hook supports optional params)
+  $args = func_get_args();
+  array_shift($args); 
+  
+  if (count($args)) 
+  {
+    array_shift($args); 
+  }
+  
+  $view = views_get_view($name);
+  $output = $view->preview($display,$args);
+  
+  if ($view->result) 
+  {
+    return $output;
+  }
+}
+
+
+
+  function viewslinks_menu_alter(&$items) 
+    {
+
+  $items['lenta_follow_kultura']['access callback'] = FALSE;
+    dpm($items);
+
+  return true;
+   }
+
+
+    /*
+     
+    function view_is_empty() 
+    {
+     $view = views_get_view_result('lenta_follow_kultura');
+     
+     if (empty($view)) 
+     {
+       echo "View is empty";
+     }
+     else 
+     {
+      echo "View is not empty";
+     }
+      return true;
+    } */
+

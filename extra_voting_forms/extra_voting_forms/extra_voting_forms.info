@@ -1,0 +1,12 @@
+name = Extra Voting forms
+description = Extra voting forms based on the VotingAPI
+package = Voting
+dependencies[] = votingapi
+core = 7.x
+
+; Information added by drupal.org packaging script on 2011-02-25
+version = "7.x-1.x-dev"
+core = "7.x"
+project = "extra_voting_forms"
+datestamp = "1298619217"
+

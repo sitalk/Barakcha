@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-US" lang="en-US">
+<!-- git web interface version 1.7.3.GIT, (C) 2005-2006, Kay Sievers <kay.sievers@vrfy.org>, Christian Gierke -->
+<!-- git core binaries version 1.7.4.1 -->
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+<meta name="generator" content="gitweb/1.7.3.GIT git/1.7.4.1"/>
+<meta name="robots" content="index, nofollow"/>
+<title>drupalcode.org Git - sandbox/sumsi/1074206.git/blob - vote.info</title>
+<base href="http://drupalcode.org" />
+<link rel="stylesheet" type="text/css" href="/gitweb.css"/>
+<link rel="stylesheet" type="text/css" href="/highlight.css"/>
+<link rel="alternate" title="sandbox/sumsi/1074206.git - history of vote.info - RSS feed" href="http://drupalcode.org/sandbox/sumsi/1074206.git/rss?f=vote.info" type="application/rss+xml" />
+<link rel="alternate" title="sandbox/sumsi/1074206.git - history of vote.info - RSS feed (no merges)" href="http://drupalcode.org/sandbox/sumsi/1074206.git/rss?f=vote.info;opt=--no-merges" type="application/rss+xml" />
+<link rel="alternate" title="sandbox/sumsi/1074206.git - history of vote.info - Atom feed" href="http://drupalcode.org/sandbox/sumsi/1074206.git/atom?f=vote.info;opt=--no-merges" type="application/atom+xml" />
+<link rel="alternate" title="sandbox/sumsi/1074206.git - history of vote.info - Atom feed (no merges)" href="http://drupalcode.org/sandbox/sumsi/1074206.git/atom?f=vote.info;opt=--no-merges" type="application/atom+xml" />
+<link rel="shortcut icon" href="/git-favicon.png" type="image/png" />
+</head>
+<body>
+<div class="page_header">
+<a title="git homepage" href="http://drupal.org/"><img src="/git-logo.png" width="72" height="27" alt="git" class="logo"/></a><a href="/">projects</a> / <a href="http://drupalcode.org/sandbox/sumsi/1074206.git">sandbox/sumsi/1074206.git</a> / blob
+</div>
+<form method="get" action="http://drupalcode.org/sandbox/sumsi/1074206.git" enctype="application/x-www-form-urlencoded">
+<div class="search">
+<input name="a" type="hidden" value="search" />
+<input name="h" type="hidden" value="HEAD" />
+<select name="st" >
+<option selected="selected" value="commit">commit</option>
+<option value="grep">grep</option>
+<option value="author">author</option>
+<option value="committer">committer</option>
+<option value="pickaxe">pickaxe</option>
+</select><sup><a href="http://drupalcode.org/sandbox/sumsi/1074206.git/search_help">?</a></sup> search:
+<input type="text" name="s"  />
+<span title="Extended regular expression"><label><input type="checkbox" name="sr" value="1" />re</label></span></div>
+</form>
+<div class="page_nav">
+<a href="http://drupalcode.org/sandbox/sumsi/1074206.git">summary</a> | <a href="http://drupalcode.org/sandbox/sumsi/1074206.git/shortlog">shortlog</a> | <a href="http://drupalcode.org/sandbox/sumsi/1074206.git/log">log</a> | <a href="http://drupalcode.org/sandbox/sumsi/1074206.git/commit/HEAD">commit</a> | <a href="http://drupalcode.org/sandbox/sumsi/1074206.git/commitdiff/HEAD">commitdiff</a> | <a href="http://drupalcode.org/sandbox/sumsi/1074206.git/tree/HEAD">tree</a><br/>
+<a href="http://drupalcode.org/sandbox/sumsi/1074206.git/blame/HEAD:/vote.info">blame</a> | <a href="http://drupalcode.org/sandbox/sumsi/1074206.git/history/HEAD:/vote.info">history</a> | <a href="http://drupalcode.org/sandbox/sumsi/1074206.git/blob_plain/HEAD:/vote.info">raw</a> | <a href="http://drupalcode.org/sandbox/sumsi/1074206.git/blob/HEAD:/vote.info">HEAD</a><br/>
+</div>
+<div class="header">
+<a class="title" href="http://drupalcode.org/sandbox/sumsi/1074206.git/commit/HEAD">Rethinking bundles.</a>
+</div>
+<div class="page_path"><a title="tree root" href="http://drupalcode.org/sandbox/sumsi/1074206.git/tree/HEAD">[sandbox/sumsi/1074206.git]</a> / <a title="vote.info" href="http://drupalcode.org/sandbox/sumsi/1074206.git/blob_plain/HEAD:/vote.info">vote.info</a><br/></div>
+<div class="page_body">
+<div class="pre"><a id="l1" href="http://drupalcode.org/sandbox/sumsi/1074206.git/blob/HEAD:/vote.info#l1" class="linenr">   1</a> name&nbsp;=&nbsp;Vote&nbsp;API</div>
+<div class="pre"><a id="l2" href="http://drupalcode.org/sandbox/sumsi/1074206.git/blob/HEAD:/vote.info#l2" class="linenr">   2</a> description&nbsp;=&nbsp;Vote&nbsp;API</div>
+<div class="pre"><a id="l3" href="http://drupalcode.org/sandbox/sumsi/1074206.git/blob/HEAD:/vote.info#l3" class="linenr">   3</a> package&nbsp;=&nbsp;Voting</div>
+<div class="pre"><a id="l4" href="http://drupalcode.org/sandbox/sumsi/1074206.git/blob/HEAD:/vote.info#l4" class="linenr">   4</a> core&nbsp;=&nbsp;7.x</div>
+<div class="pre"><a id="l5" href="http://drupalcode.org/sandbox/sumsi/1074206.git/blob/HEAD:/vote.info#l5" class="linenr">   5</a> version&nbsp;=&nbsp;7.x-1.x-dev</div>
+</div><div class="page_footer">
+<div class="cachetime">Cache Last Updated: Thu Oct 11 06:24:28 2012 GMT</div>
+<!--
+	Full URL: |/sandbox/sumsi/1074206.git/blob/HEAD:/vote.info?|
+	URL Hash: |4ea3477d490d1e80e264cdff72df9d45|
+-->
+<div class="page_footer_text">For more information about this repository, visit the project page at http://drupal.org/sandbox/sumsi/1074206</div>
+<a class="rss_logo" title="history of vote.info RSS feed" href="http://drupalcode.org/sandbox/sumsi/1074206.git/rss?f=vote.info">RSS</a>
+<a class="rss_logo" title="history of vote.info Atom feed" href="http://drupalcode.org/sandbox/sumsi/1074206.git/atom?f=vote.info">Atom</a>
+</div>
+<script type="text/javascript" src="/gitweb.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+
+
+<?php
+
+/**
+* @file
+* Prevents the user from voting mupltiple times on a node
+*
+* Checks the tag for the current vote and deletes the rest from the database
+*/
+
+
+/**
+* Implementation of hook_votingapi_insert().
+*/
+
+/**
+* Implementation of hook_votingapi_storage_delete_votes().
+*/
+
+
+function limitvotes_votingapi_insert($vote)
+
+   {
+      drupal_set_message(t('You have just voted.'), 'status');
+   }
+
+
+?>
+
+

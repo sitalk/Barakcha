@@ -1,0 +1,25 @@
+<?php
+
+function multitag_vote_votingapi_results_alter(&$results, $content_type, $content_id) 
+{
+   $vote_avg_sum = 0;
+   $vote_avg_count = 0;
+   $vote_tags = 0;
+
+   foreach($results as $tag => $data) 
+   {
+      if($tag != 'vote') 
+      {
+         $vote_avg_sum += $data['percent']['average'];
+         $vote_avg_count += $data['percent']['count'];
+         $vote_tags++;
+      }
+   }
+   if($vote_tags > 0) 
+   {
+      $results['vote']['percent']['average'] = $vote_avg_sum/$vote_tags;
+      $results['vote']['percent']['count'] = $vote_avg_count/$vote_tags;
+   }
+}
+
+?>

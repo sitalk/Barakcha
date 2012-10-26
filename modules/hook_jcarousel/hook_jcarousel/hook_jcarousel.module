@@ -1,0 +1,21 @@
+<?php 
+
+function hook_jcarousel_jcarousel_skin_info() {
+  $skins = array();
+
+  $skins['default'] = array(
+    'title' => t('Default'),
+    'file' => 'skins/default/jcarousel-default.css',
+  );
+  $skins['tango'] = array(
+    'title' => t('Tango'),
+    'file' => 'skins/tango/jcarousel-tango.css',
+  );
+  $skins['atlas'] = array(
+    'title' => t('Barakcha'),
+    'file' => 'skins/atlas/jcarousel-barakcha.css',
+  );
+
+
+  return $skins;
+}

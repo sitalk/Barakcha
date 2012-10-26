@@ -1,0 +1,7 @@
+;$Id$
+
+name = Limit votes
+description = A module that allows users to vote only once on a node
+core = 7.x
+files[] = limitvotes.module
+dependencies [] = fivestar

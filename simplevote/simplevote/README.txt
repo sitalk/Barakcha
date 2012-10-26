@@ -1,0 +1,3 @@
+SimpleVote is an ultra-simple demonstration of the Drupal VotingAPI Module. It does NOT exercise the full capabilities of the API, just demonstrates how easy it can be to whip up a voting scheme with it.
+
+Naturally, SimpleVote requires the VotingAPI module, and won't run without it. It also requires a CSS-capable browser, or the voting widget won't display properly. As I have time, I'll probably be updating this module with examples of VotingAPI's more advanced features.

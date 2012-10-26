@@ -1,0 +1,14 @@
+;$Id$
+
+name = Views Hide Links
+description = This module hides the Views menu links if the view is empty.
+package = Views
+core = 7.x
+
+files[] = limitvotes.module
+
+
+
+
+
+

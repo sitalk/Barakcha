@@ -1,0 +1,17 @@
+<?php
+
+/**
+ * Implements hook_form_views_exposed_form_alter()
+ */
+function slider_example_form_views_exposed_form_alter(&$form, $form_state) {
+  if ($form['#id'] == 'views-exposed-form-test-view-page') {
+    $form['#attached']['library'][] = array('system', 'ui.slider');
+    $form['#attached']['js'][] = drupal_get_path('module', 'slider_example') . '/slider_example.js';
+    $form['#attached']['css'][] = drupal_get_path('module', 'slider_example') . '/slider_example.css';
+    $form['nid']['#prefix'] = '<div class="slider-widget-wrapper">';
+    $form['nid']['#suffix'] = '</div>';
+  }
+}
+
+?>
+

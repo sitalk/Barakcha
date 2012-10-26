@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]><html class="no-js lt-ie9 lt-ie8 lt-ie7" lang="en"> <![endif]-->
+<!--[if IE 7]><html class="no-js lt-ie9 lt-ie8" lang="en"> <![endif]-->
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en"> <![endif]-->
+<!--[if gt IE 8]><!-->
+
+<!--<![endif]-->
+
+
+
+
+    <html>
+        <head>     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.1/jquery.min.js"></script>
+    
+    <script src="bPopup_files/jquery.bpopup-0.7.0.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="bPopup_files/style.css" /> 
+    </head>
+
+
+    <script type="text/javascript"> 
+    // Semicolon (;) to ensure closing of earlier scripting
+    // Encapsulation
+    // $ is assigned to jQuery
+    ;(function($) {
+
+         // DOM Ready
+        $(function() {
+
+            // Binding a click event
+            // From jQuery v.1.7.0 use .on() instead of .bind()
+            $('#my-button').bind('click', function(e) {
+
+                // Prevents the default action to be triggered. 
+                e.preventDefault();
+
+                // Triggering bPopup when click event is fired
+                $('#element_to_pop_up').bPopup();
+
+            });
+
+        });
+
+    })(jQuery); </script>
+
+    
+        <body>
+     
+            <!-- Button that triggers the popup -->
+            <button id="my-button">POP IT UP</button>
+            <!-- Element to pop up -->
+            <div id="element_to_pop_up">Add comment
+            <span class="bClose">X</span>
+            </div>
+    
+        </body>
+    </html>
+
+

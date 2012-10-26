@@ -1,0 +1,13 @@
+;$Id$
+
+name = Comment Form Theme
+description = Themes the comment form.
+core = 7.x
+
+files[] = commentform.module
+
+
+
+
+
+

@@ -1,0 +1,97 @@
+<?php
+
+/**
+ * Implements hook_vote_pool_info().
+ */
+function vote_examples_vote_pool_info() {
+  return array(
+    'vote_example_choice' => array(
+      'type' => 'choice',
+      'name' => t('Random Choice Vote'),
+      'description' => t('Just a random choice vote.'),
+      'settings' => array(
+        'functions' => array('score', 'count'),
+        'queue' => TRUE,
+        'random' => TRUE,
+      ),
+    ),
+    'vote_example_percent' => array(
+      'type' => 'percent',
+      'name' => t('Random Percentage Vote'),
+      'description' => t('Just a random percentage vote.'),
+      'settings' => array(
+        'functions' => array('average', 'count'),
+        'queue' => TRUE,
+        'random' => TRUE,
+      ),
+    ),
+    'vote_example_percent_second' => array(
+      'type' => 'percent',
+      'name' => t('Random Percentage Vote'),
+      'description' => t('Just a random percentage vote.'),
+      'settings' => array(
+        'functions' => array('average', 'count'),
+        'queue' => TRUE,
+        'random' => TRUE,
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_vote_aggregate_info().
+ */
+function vote_examples_vote_aggregate_info() {
+  return array(
+    'vote_example_percent' => array(
+      'type' => 'percent',
+      'name' => t('Percent Aggregate'),
+      'description' => t('Just a percent aggregate.'),      
+      'settings' => array(
+        'pools' => array('vote_example_percent', 'vote_example_percent_second'),
+        'functions' => array('average', 'count'),
+        'queue' => TRUE,
+      ),
+    ),
+  );
+}
+
+/**
+ * Casts random votes on all "random" pools.
+ *
+ * @param $count
+ *   The number of votes that will be saved for each pool.
+ */
+function vote_examples_random_votes($count) {
+  $info = entity_get_info();
+  unset($info['vote']);
+
+  $entity_type = array_rand($info);
+  $entity_id = rand(1, 100);
+
+  // Find all "random" pools and apply the votes.
+  foreach (vote_pool_get_pools() as $pool) {
+    if (!empty($pool->settings['random'])) {
+      for ($i = 1; $i <= $count; $i++) {
+        $vote = (object) array(
+          'pool' => $pool->pool,
+          'entity_type' => $entity_type,
+          'entity_id' => $entity_id,
+          'value' => rand(1, 100),
+          'uid' => 1,
+          'sid' => '',
+        );
+
+        vote_save($vote);
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_preprocess_page().
+ */
+function vote_examples_preprocess_page() {
+  // Create five votes in every "random" pool.
+  vote_examples_random_votes(1);
+}

@@ -1,0 +1,8 @@
+<?php
+
+/**
+ * @file
+ * Provides a basic Field API integration for voting fields. This functionality
+ * can be used by contrib modules to provide voting fields with much less
+ * effort.
+ */

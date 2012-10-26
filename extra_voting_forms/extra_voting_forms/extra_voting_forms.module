@@ -1,0 +1,1588 @@
+<?php
+
+/**
+ * Implementation of hook_help().
+ */
+function extra_voting_forms_help($path, $arg) {
+  switch ($path) {
+    case 'admin/modules#description':
+      // This description is shown in the listing at admin/modules.
+      return t('Extra voting forms for VotingAPI');
+  }
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function extra_voting_forms_perm() {
+  return array('give points with extra voting forms',
+               'voting administrator',
+               'voting vote bonus',
+               'bypass voting anti-abuse system'
+              );
+}
+
+/**
+ * Implementation of hook_menu.
+ */
+function extra_voting_forms_menu() {
+  $items = array();
+
+  // Administration entry. This makes sure the module can be configured
+  // from Drupal's "admin" link
+
+  $items['admin/settings/extra_voting_forms'] = array(
+    'title' => 'Extra Voting Forms - nodeapi',
+    'description' => 'Settings for the "extra voting forms" module',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('extra_voting_forms_admin_settings'),
+    'access callback' => 'user_access',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );  
+  $items['extra_voting_forms/handle'] = array(
+    'title' => 'Extra Voting Forms - Ajax',
+    'description' => 'Voting system',
+    'page callback' => 'extra_voting_forms_handle',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  // That's all!
+  return $items;
+}
+
+/**
+ * Implementation of hook_init().
+ */
+function extra_voting_forms_init(){
+  // Create the $css_file_complete variable
+  $css_file = 'extra_voting_forms_all.css';
+  $widget_dir = variable_get('extra_voting_forms_widget_dir', 'default');
+  $widget_dir_themes = variable_get('extra_voting_forms_widget_dir_in_themes', FALSE);
+
+  if (!$widget_dir_themes) {
+    $css_file_complete = drupal_get_path('module', 'extra_voting_forms') .'/widgets/'. $widget_dir .'/'. $css_file;
+  }
+  else {
+    $css_file_complete =  path_to_theme() .'/widgets/'. $widget_dir .'/'. $css_file;
+  }
+
+  // Add the css - the user-specified one if there is one, or the
+  // module's
+  drupal_add_css($css_file_complete, 'module');
+
+  // Add jquery.js
+  drupal_add_js('misc/jquery.js', 'core');
+
+  // Add the module-specific js file
+  drupal_add_js(drupal_get_path('module', 'extra_voting_forms') .'/extra_voting_forms.js');
+
+  // Add our JavaScript variables:
+  drupal_add_js(array(
+    'extra_voting_forms' => array(
+      // Set the right javascript to see of only one vote is allowed:
+      'only_one_vote' => variable_get('extra_voting_forms_only_one_vote', FALSE) && ! user_access('voting administrator') ? 1 : 0,
+      // Set the anonymous URL:
+      'login_page' => extra_voting_forms_anonymous_url(),
+      // Get the base path:
+      'base_path' => base_path()
+    )
+  ), 'setting');
+}
+
+/**
+ * Return the configuration form
+ *
+ * @return
+ *   The config form
+ */
+function extra_voting_forms_admin_settings() {
+  
+  $form['extra_voting_forms_widget_dir_sections'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Directory for Widgets'),
+    '#collapsible' => FALSE,
+    '#collapsed' => FALSE,
+  );
+  
+  $form['extra_voting_forms_widget_dir_sections']['extra_voting_forms_widget_dir'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Widget directory'),
+    '#description' => t('The directory that defines the voting system\'s widgets'),
+    '#size' => 35,
+    '#maxlength' => 128,
+    '#required' => FALSE,
+    '#default_value' =>variable_get('extra_voting_forms_widget_dir', 'default'),
+  );
+  
+  $form['extra_voting_forms_widget_dir_sections']['extra_voting_forms_widget_dir_in_themes'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Widgets are located in the current theme directory'),
+    '#description' => t("If checked, the module will look for widgets in a directory called 'widgets' in the current theme. This will allow you to create your own widgets without touching the module itself. It's highly recommended to use this option if you personalise a stock widget"),
+    '#default_value' => variable_get('extra_voting_forms_widget_dir_in_themes', FALSE), 
+  );
+
+  $form['extra_voting_forms_node_types_applied'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Node types that will accept karma'),
+    '#default_value' => variable_get('extra_voting_forms_node_types_applied', array()),
+    '#options' => node_get_types('names'),
+  );
+  
+  $form['extra_voting_forms_allow_karma_for_comments'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Allow karma for comments'),
+    '#default_value' => variable_get('extra_voting_forms_allow_karma_for_comments', TRUE),
+  );
+
+  $form['extra_voting_forms_anonymous_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('URL where anonymous users will be directed to when they try to vote. If blank, people will be directed to user/login'),
+    '#size' => 50,
+    '#maxlength' => 128,
+    '#required' => FALSE,
+    '#default_value' => variable_get('extra_voting_forms_anonymous_url', ''),
+  );
+
+  $form['link_sections'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Link sections'),
+    '#collapsible' => FALSE,
+    '#collapsed' => FALSE,
+  );
+
+  $form['link_sections']['extra_voting_forms_display_in_node_link'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Display the karma form in the links section of a node'),
+    '#description' => t('NOTE: if you don\'t tick this box, you\'ll need to have <code> &lt;? print extra_voting_forms_show_form($node,\'n\' ,3) ?&gt;</code> (or similar, the last parameter will determine the style) in your node template!'),
+    '#default_value' => variable_get('extra_voting_forms_display_in_node_link', TRUE),
+  );
+  
+  $form['link_sections']['extra_voting_forms_display_in_node_link_style'] = array(
+    '#type' => 'select',
+    '#title' => t('Form style...'),
+    '#default_value' => variable_get('extra_voting_forms_display_in_node_link_style', 2),
+    '#options' => array(
+      1 => t('Selection - full'),
+      2 => t('Selection - negatives only'),
+      3 => t('Up, down'),
+      4 => t('Up only'),
+    ),
+    '#description' =>  t('Please see documentation to know what each style is'),
+  );
+  
+  $form['link_sections']['extra_voting_forms_display_in_comment_link'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Display the karma form in the links section of a comment'),
+    '#description' => t('NOTE: if you don\'t tick this box, you\'ll need to have <code> &lt;? print extra_voting_forms_show_form($comment,\'c\') ?&gt;</code> in your comment template!'),
+    '#default_value' => variable_get('extra_voting_forms_display_in_comment_link', TRUE),
+  );
+
+  $form['link_sections']['extra_voting_forms_display_in_comment_link_style'] = array(
+    '#type' => 'select',
+    '#title' => t('Form style...'),
+    '#default_value' => variable_get('extra_voting_forms_display_in_comment_link_style', 3),
+    '#options' => array(
+      1 => t('Selection - full'),
+      2 => t('Selection - negatives only'),
+      3 => t('Up, down'),
+      4 => t('Up only'),
+    ),
+    '#description' =>  t('Please see documentation to know what each style is'),
+  );
+
+  $form['extra_voting_forms_only_one_vote'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Only allow one vote - no re-voting allowed'),
+    '#default_value' => variable_get('extra_voting_forms_only_one_vote', TRUE),
+  );
+
+  $form['extra_voting_forms_hide_given_select_votes'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Will hide the vote given by the select box'),
+    '#default_value' => variable_get('extra_voting_forms_hide_given_select_votes', FALSE),
+  );
+
+  $form['extra_voting_forms_vote_within_hours_n'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Do not allow voting for nodes older than: (In hours, 0 for "forever")'),
+    '#size' => 5,
+    '#maxlength' => 5,
+    '#required' => TRUE,
+    '#default_value' => variable_get('extra_voting_forms_vote_within_hours_n', 72),
+  );
+  
+  $form['extra_voting_forms_vote_within_hours_c'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Do not allow voting for comments older than: (In hours, 0 for "forever")'),
+    '#size' => 5,
+    '#maxlength' => 5,
+    '#required' => TRUE,
+    '#default_value' => variable_get('extra_voting_forms_vote_within_hours_c', 168),
+  );
+  
+  $form['voting_range'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Allowed voting range'),
+  );
+  
+  $form['voting_range']['extra_voting_forms_range_users_plus_n'] = array(
+    '#type' => 'textfield',
+    '#title' => t('POSITIVE karma points for normal users - NODES'),
+    '#size' => 3,
+    '#maxlength' => 3,
+    '#required' => TRUE,
+    '#default_value' => variable_get('extra_voting_forms_range_users_plus_n', 1),
+  );
+
+  $form['voting_range']['extra_voting_forms_range_users_minus_n'] = array(
+    '#type' => 'textfield',
+    '#title' => t('NEGATIVE karma points for normal users - NODES'),
+    '#size' => 3,
+    '#maxlength' => 3,
+    '#required' => TRUE,
+    '#default_value' => variable_get('extra_voting_forms_range_users_minus_n', 3),
+  );
+
+  $form['voting_range']['extra_voting_forms_range_users_plus_c'] = array(
+    '#type' => 'textfield',
+    '#title' => t('POSITIVE karma points for normal users - COMMENTS'),
+    '#size' => 3,
+    '#maxlength' => 3,
+    '#required' => TRUE,
+    '#default_value' => variable_get('extra_voting_forms_range_users_plus_c', 1),
+  );
+  
+  $form['voting_range']['extra_voting_forms_range_users_minus_c'] = array(
+    '#type' => 'textfield',
+    '#title' => t('NEGATIVE karma points for normal users - COMMENTS'),
+    '#size' => 3,
+    '#maxlength' => 3,
+    '#required' => TRUE,
+    '#default_value' => variable_get('extra_voting_forms_range_users_minus_c', 1),
+  );
+
+  $form['voting_range']['bonus_range_n'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Bonus amount - NODES'),
+    '#collapsible' => FALSE,
+    '#collapsed' => FALSE,
+  );
+
+  $form['voting_range']['bonus_range_n']['extra_voting_forms_vote_bonus_admin_minus_n'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Extra NEGATIVE range values for adminstrators'),
+    '#size' => 3,
+    '#maxlength' => 3,
+    '#required' => FALSE,
+    '#default_value' => variable_get('extra_voting_forms_vote_bonus_admin_minus_n', 0),
+    '#description' =>  t('If you set it to 3, the admin will have an extra 3 points in the negative karma range set'),
+  );
+
+  $form['voting_range']['bonus_range_n']['extra_voting_forms_vote_bonus_admin_plus_n'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Extra POSITIVE range values for adminstrators'),
+    '#size' => 3,
+    '#maxlength' => 3,
+    '#required' => FALSE,
+    '#default_value' => variable_get('extra_voting_forms_vote_bonus_admin_plus_n', 0),
+    '#description' =>  t('If you set it to 3, the admin will have an extra 3 points in the positive range set'),
+    '#weight' => -10,
+  );
+
+  $form['voting_range']['bonus_range_n']['extra_voting_forms_vote_bonus_minus_n'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Extra NEGATIVE range for users with permission "voting vote bonus"'),
+    '#size' => 3,
+    '#maxlength' => 3,
+    '#default_value' => variable_get('extra_voting_forms_vote_bonus_minus_n', 0),
+  );
+
+  $form['voting_range']['bonus_range_n']['extra_voting_forms_vote_bonus_plus_n'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Extra POSITIVE range for users with permission "voting vote bonus"'),
+    '#size' => 3,
+    '#maxlength' => 3,
+    '#default_value' => variable_get('extra_voting_forms_vote_bonus_plus_n', 0),
+  );
+
+  $form['voting_range']['bonus_range_c'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Bonus amount - COMMENTS'),
+    '#collapsible' => FALSE,
+    '#collapsed' => FALSE,
+  );
+  
+  $form['voting_range']['bonus_range_c']['extra_voting_forms_vote_bonus_admin_minus_c'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Extra NEGATIVE range values for adminstrators'),
+    '#size' => 3,
+    '#maxlength' => 3,
+    '#required' => FALSE,
+    '#default_value' => variable_get('extra_voting_forms_vote_bonus_admin_plus_c', 0),
+    '#description' =>  t('If you set it to 3, the admin will have an extra 3 points in the range set'),
+  );
+
+  $form['voting_range']['bonus_range_c']['extra_voting_forms_vote_bonus_admin_plus_c'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Extra POSITIVE range values for adminstrators'),
+    '#size' => 2,
+    '#maxlength' => 2,
+    '#required' => TRUE,
+    '#default_value' => variable_get('extra_voting_forms_vote_bonus_admin_plus_c', 0),
+    '#description' =>  t('If you set it to 3, the admin will have an extra 3 points in the range set'),
+  );
+
+  $form['voting_range']['bonus_range_c']['extra_voting_forms_vote_bonus_minus_c'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Extra NEGATIVE range for users with permission "voting vote bonus"'),
+    '#size' => 3,
+    '#maxlength' => 3,
+    '#default_value' => variable_get('extra_voting_forms_vote_bonus_minus_c', 0),
+  );
+  
+  $form['voting_range']['bonus_range_c']['extra_voting_forms_vote_bonus_plus_c'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Extra POSITIVE range for users with permission "voting vote bonus"'),
+    '#size' => 3,
+    '#maxlength' => 3,
+    '#default_value' => variable_get('extra_voting_forms_vote_bonus_plus_c', 0),
+   );
+  
+  $form['up_down_voting_power'] = array(
+    '#type' => 'fieldset',
+    '#description' => t('How any points voting up/down will give. These values NEED to be within the range specified above!'),
+    '#title' => t('Up/Down voting values'),
+  );
+
+  $form['up_down_voting_power']['extra_voting_forms_updown_voting_up_n'] = array(
+    '#type' => 'textfield',
+    '#title' => t('How much voting power when a story is voted UP - NODES'),
+    '#size' => 3,
+    '#required' => TRUE,
+    '#maxlength' => 3,
+    '#default_value' => variable_get('extra_voting_forms_updown_voting_up_n', '1'),
+  );
+
+  $form['up_down_voting_power']['extra_voting_forms_updown_voting_down_n'] = array(
+    '#type' => 'textfield',
+    '#title' => t('How much voting power when a story is voted DOWN - NODES'),
+    '#size' => 3,
+    '#required' => TRUE,
+    '#maxlength' => 3,
+    '#default_value' => variable_get('extra_voting_forms_updown_voting_down_n', '-1'),
+  );
+
+  $form['up_down_voting_power']['extra_voting_forms_updown_voting_up_c'] = array(
+    '#type' => 'textfield',
+    '#title' => t('How much voting power when a story is voted UP - COMMENTS'),
+    '#size' => 3,
+    '#required' => TRUE,
+    '#maxlength' => 3,
+    '#default_value' => variable_get('extra_voting_forms_updown_voting_up_c', '1'),
+  );
+
+  $form['up_down_voting_power']['extra_voting_forms_updown_voting_down_c'] = array(
+    '#type' => 'textfield',
+    '#title' => t('How much voting power when a story is voted DOWN - COMMENTS'),
+    '#size' => 3,
+    '#required' => TRUE,
+    '#maxlength' => 3,
+    '#default_value' => variable_get('extra_voting_forms_updown_voting_down_c', '-1'),
+  );
+
+  $form['anti_abuse'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Anti-abuse system'),
+  );
+
+  $form['anti_abuse']['extra_voting_forms_abuse_raw_votes'] = array(
+    '#type' => 'textfield',
+    '#title' => t('This is the maximum number of times a user can award points...'),
+    '#size' => 4,
+    '#maxlength' => 4,
+    '#default_value' => variable_get('extra_voting_forms_abuse_raw_votes', ''),
+  );
+  
+  $form['anti_abuse']['extra_voting_forms_abuse_raw_votes_every'] = array(
+    '#type' => 'textfield',
+    '#title' => t('...every how many hours?'),
+    '#size' => 4,
+    '#maxlength' => 4,
+    '#default_value' => variable_get('extra_voting_forms_abuse_raw_votes_every', ''),
+  );
+
+  $form['anti_abuse']['extra_voting_forms_abuse_total_points'] = array(
+    '#type' => 'textfield',
+    '#title' => t('This is the maximum amount of points a user can award in total...'),
+    '#size' => 4,
+    '#maxlength' => 4,
+    '#default_value' => variable_get('extra_voting_forms_abuse_total_points', ''),
+  );
+
+  $form['anti_abuse']['extra_voting_forms_abuse_total_every'] = array(
+    '#type' => 'textfield',
+    '#title' => t('...every how many hours?'),
+    '#size' => 4,
+    '#maxlength' => 4,
+    '#default_value' => variable_get('extra_voting_forms_abuse_total_every', ''),
+  );
+
+  $result = db_query('SELECT rid, name FROM {role} ORDER BY name');
+  $role_options = array();
+  $role_options[0] = t("None");
+
+  while ($role = db_fetch_object($result)) {
+    if ($role->rid != 1 && $role->rid != 2) {
+      $role_options[$role->rid] = $role->name;
+    }
+  }
+  
+  $form['explanations'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Explanation text for voting points'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+
+  for ($i = -6; $i <= 6; $i++) {
+    $form['explanations']['extra_voting_forms_explanation_'. $i] = array(
+      '#type' => 'textfield',
+      '#title' => t('Explanation for field ') . $i,
+      '#size' => 20,
+      '#maxlength' => 40,
+      '#default_value' => variable_get('extra_voting_forms_explanation_'. $i, ''),
+    );
+  }
+  
+  $form['vote_to_display'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Karma to display'),
+    '#description' => t('IMPORTANT: you NEED to run a mass-recalculation of the karma cache for these changes to take effect!'),
+  );
+
+  $display_karma_options[0] = t("Do not display karma at all");
+  $display_karma_options[1] = t("Display the actual karma");
+
+  $form['vote_to_display']['extra_voting_forms_display_karma_for_n'] = array(
+    '#title' => t('Karma to display for nodes'),
+    '#type' => 'radios',
+    '#options' => $display_karma_options,
+    '#default_value' => variable_get('extra_voting_forms_display_karma_for_n', 1),
+  );
+
+  $form['vote_to_display']['extra_voting_forms_display_karma_for_c'] = array(
+    '#title' => t('Karma to display for comments'),
+    '#type' => 'radios',
+    '#options' => $display_karma_options,
+    '#default_value' => variable_get('extra_voting_forms_display_karma_for_c', 1),
+  );
+  
+  return system_settings_form($form);
+}
+
+/** 
+ * Implementation of hook_validate(). 
+ * Used to validate extra_voting_forms_admin_settings()
+ * The only interesting part is that it will "derail" the flow in case
+ * the user clicked on the "Mass recalculation" button
+ */
+function extra_voting_forms_admin_settings_validate($form_id, &$form_state) {
+
+}
+
+/** 
+ * Implementation of hook_link(). 
+ * This will show the form in the link IF the admin set the module
+ * to do so, IF the user can vote, IF the user is not anonymous,
+ * Note that extra_voting_forms_show_form does all the checking to see
+ * if the comment was buried
+ */
+function extra_voting_forms_link($type, $node =  NULL, $main = FALSE) {
+  //if (user_access('give points with extra voting forms')) {
+    $links = array();
+    
+	// Are we displaying the node's "links" section?
+	if ($type == 'comment' ) {
+      // If the system allow karma for comments, AND if the user decided to
+      // show the karma form in the "links" section, then add the link
+      if (variable_get('extra_voting_forms_display_in_comment_link', FALSE)) {
+        if ( variable_get('extra_voting_forms_allow_karma_for_comments', FALSE)) {
+          $style = variable_get('extra_voting_forms_display_in_comment_link_style', 1);  
+
+          // Add the link
+          $links['extra_voting_forms'] = array(
+            'title' => extra_voting_forms_show_form($node, 'c', $style, 'small'),
+            "html" => true
+          );
+        }
+      }
+    }
+    // Are we displaying the node's "links" section?
+    if ($type == 'node') {
+      // If the system allow karma for nodes, AND if the user decided to
+      // show the karma form in the "links" section, then add the link
+      if (variable_get('extra_voting_forms_display_in_node_link', FALSE)) {
+        if ( in_array($node->type, variable_get('extra_voting_forms_node_types_applied', array()), TRUE) ) {
+          $style = variable_get('extra_voting_forms_display_in_node_link_style', 1);
+          // Add the link
+          $links['extra_voting_forms'] = array(
+            'title' => extra_voting_forms_show_form($node, 'n', $style, 'small'),
+            "html" => true
+          );
+        }
+      }      
+    }
+  //}
+  return $links; 
+}
+/* **************************************************************
+ *
+ *             FUNCTIONS TO DO SOME ABUSE CHECKS
+ *
+ * **************************************************************
+ */
+/**
+ * It checks if the user has voted on too many different objects, regardless
+ * of the vote
+ *
+ * @param
+ *   $account. If defined, will check $account> otherwise, will check the
+ *   currently logged in user
+ * @return
+ *   TRUE if the user is above his/her allowance
+ *   FALSE otherwise.
+ */
+function extra_voting_forms_too_many_votes_cast($account = NULL) {
+  global $user;
+  
+  // Check which account to vote from
+  if ($account == NULL) {
+    $account = $user;
+  }
+
+  // Get the limit
+  $limit = variable_get('extra_voting_forms_abuse_raw_votes', '');
+  $limit_every = variable_get('extra_voting_forms_abuse_raw_votes_every', '');
+
+  // There is no limit: do nothing
+  if ($limit == '') {
+    return FALSE;
+  }
+
+  // Convert the limit into seconds...
+  $limit_every *= 3600;
+  $result = db_result(db_query("SELECT COUNT(*) AS count FROM {votingapi_vote} WHERE uid = %d AND value_type = '%s' AND tag = '%s' AND timestamp > UNIX_TIMESTAMP(CURRENT_TIMESTAMP()) - %d", $account->uid, 'points', 'vote', $limit_every));
+
+  // Over the limit: don't accept it!
+  if ($result > $limit) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * It checks if the user has given/taken too much points in general
+ *
+ * @param $vote
+     The karmic vote the user wishes to case
+ * @param
+ *   $account. If defined, will check $account> otherwise, will check the
+ *   currently logged in user
+ * @return
+ *   TRUE if $vote would get the user to go over the configured limit.
+ *   FALSE otherwise.
+ */
+function extra_voting_forms_too_many_votes_total($vote, $account = NULL) {
+  
+  global $user;
+
+  // Check which account to vote from
+  if ($account == NULL) {
+    $account = $user;
+  }
+
+  $total_points = variable_get('extra_voting_forms_abuse_total_points', '');
+  $total_every = variable_get('extra_voting_forms_abuse_total_every', '');
+  
+  // If person_points is not set, don't bother
+  if ($total_points == '') {
+    return FALSE;
+  }
+  
+  // Convert total_every into seconds...
+  $total_every  *= 3600;
+
+  // Find out how many points were awarded over the last however long
+
+  $result = db_result(db_query("SELECT SUM(abs(value)) FROM {votingapi_vote} WHERE uid = %d AND value_type = '%s' AND tag = '%s' AND timestamp > UNIX_TIMESTAMP(CURRENT_TIMESTAMP()) - %d", $account->uid, 'points', 'vote', $total_every));
+
+  $result += abs($vote);
+
+  // Return TRUE if the result is outside the allowable range
+  if ($result + $vote > $total_points || $result < ($total_points * -1 )) {
+    return TRUE;
+  }
+  
+  // ALl OK!
+  return FALSE;
+}
+
+/* **************************************************************
+ *                      *** END OF ***
+ *             FUNCTIONS TO DO SOME ABUSE CHECKS
+ *
+ * **************************************************************
+ */
+/**
+ * It loads a $o object, based on its sk_ fields. This is important
+ * because this module handles votes for nodes and comments, and
+ * sometimes it only knows the IDst
+ * 
+ * @param $o
+ *   The object. Only sk_id and sk_type need to be set
+ * 
+ * @return
+ *   The object loaded.
+ */
+function extra_voting_forms_load_object($o) {
+
+  // It's a comment
+  if ($o->sk_type == 'c') {
+    // Try to load the comment. If it can't, just redirect to the
+    // home page
+    $r = _comment_load($o->sk_id);
+    if (!$r) {
+      return NULL;
+    }
+    $r->sk_id = $r->cid;
+    $r->sk_type = 'c';
+    return $r;
+  }
+  
+  // It's a node
+  if ($o->sk_type == 'n') {
+    // Try to load the comment. If it can't, just redirect to the
+    // home page
+    $r = node_load($o->sk_id);
+    if (!$r) {
+      return NULL;
+    }
+    $r->sk_id = $r->nid;
+    $r->sk_type = 'n';
+    return $r;
+  }
+  #drupal_set_message("OOO");
+  return NULL;
+}
+
+/* **************************************************************
+ *
+ *       FUNCTIONS TO MANAGE THE ACTUAL VOTING PROCESS
+ *
+ * **************************************************************
+ */
+/**
+ * It handles the actual request. This is a "preparation" function.
+ * It basically makes sure that everything is in order (the input
+ * variables are fine, the comment can be loaded, etc.
+ * THEN, it runs the extra_voting_forms_give_vote() function (which returns
+ * an error message or '' if all OK). And then, it returns that error/result
+ * to the user "the right way" using extra_voting_forms_return()
+ * To know what the "right way" is, see extra_voting_forms_return()
+ * 
+ * @return
+ *   The response. It might be just a string (no page template, or anything)
+ *   or it could be a full page.
+ */
+function extra_voting_forms_handle() {
+
+  global $_POST, $user;
+  
+  // The form has been posted...
+  if ($_POST['form_type']) { 
+    // Set the incoming variables$oid
+    $oid        = $_POST['oid'];
+    $otype      = $_POST['otype'];
+    $karma_vote = $_POST['karma_vote'];
+    $form_type  = $_POST['form_type'];
+
+    // If otype isn't 'c' or 'n', return to the home page
+    if ($otype != 'c' && $otype != 'n') {
+      exit(extra_voting_forms_return($form_type, $o, t('Error in the form'), '') );
+    }
+
+    // Create the object, and load it
+    $o = new stdClass();
+    $o->sk_id = $oid;
+    $o->sk_type = $otype;
+    $o = extra_voting_forms_load_object($o);
+
+    if (!$o) {
+      exit(extra_voting_forms_return($form_type, $o, t('Error loading the object!'), ''));
+    }
+
+    // Check that $form_type is sane. extra_voting_forms_return does NOT
+    // check it as a parameter
+    if ($form_type != 'ajax' && $form_type != 'form') {
+      drupal_set_message(t('Error in the parameters!'), 'error');
+      drupal_goto('node/'. $o->nid);
+    }    
+
+    // It's a direct form, and the user doesn't
+    // have voting rights!
+    if ($form_type != 'ajax' && $user->uid == 0) {
+      drupal_goto(extra_voting_forms_anonymous_url(), "destination=". extra_voting_forms_destination($o) );
+    }
+
+    // Give the vote and return. $give_vote_return will return the error
+    // message (if there was one) or '' if all went OK. This is exactly what
+    // extra_voting_forms_return expects, which is handy...
+    list($give_vote_return, $k) = extra_voting_forms_give_vote($o, $karma_vote);
+
+    if (! variable_get('extra_voting_forms_display_karma_for_'. $o->sk_type, 0) ) {
+      $k = '';
+    }
+    drupal_set_header("Content-Type: text/json");
+    exit( extra_voting_forms_return($form_type, $o, $give_vote_return, $k) );
+  }
+}
+
+/**
+ * Give a karmic vote to a particular object
+ *
+ * @param $o
+ *   The actual object, loaded and ready to roll
+ * @param $vote
+ *   The karmic vote
+ * @return
+ *   ($return,$total_karma)
+ *   This function returns a LIST.
+ *   $return is the error message. It is an empty string '' if everything 
+ *   was good. OR, an error message if things didn't go so well.
+ *   $total_karma is the object's total karma after the vote.
+ */
+function extra_voting_forms_give_vote($o, $vote, $account = NULL) {
+  global $user;
+
+  // Check which account to vote from
+  if ($account == NULL) {
+    $account = $user;
+  }
+  
+  // The user is not logged in: RETURN with error
+  if ($account->uid == 0) {
+    return array( t("Only logged in users can vote!"), 0 );
+  }
+
+  #if($user->uid == 11061){
+  #  drupal_set_message('o->sk_type '.$o->sk_type);
+  #  drupal_set_message('account->uid '.$account->uid);
+  #  drupal_set_message('o->uid '.$o->uid);
+  #  drupal_set_message('access '.user_access('voting administrator', $account)  );
+  #  }
+
+  // The user can't vote on his/her own comments, return error
+  // (Note: admin and the karma admin can!)
+  if ($o->sk_type == 'c' && $account->uid == $o->uid && $account->uid != 1 & ! user_access('voting administrator', $account)) {
+    return array( t("You can't vote on your own comments!"), 0 );
+  }
+
+  // The user does not have voting rights: RETURN with error
+  if (!user_access('give points with extra voting forms', $account)) {
+    return array( t("You are not allowed to vote"), 0 );
+  }
+
+  // The module is set so that it doesn't give the ability to vote
+  // based on comments. Return an error
+  if ($o->sk_type == 'c' && !variable_get('extra_voting_forms_allow_karma_for_comments', FALSE)) {
+    return array( t("This module doesn't allow giving karma for comments"), 0 );
+  }
+
+  // The module is set so that it doesn't give the ability to vote
+  // based on this particulat note type. Return an error
+  $types = variable_get('extra_voting_forms_node_types_applied', array() );
+  if ($o->sk_type == 'n' && ! $types[$o->type] ) {
+    return array( t("This module doesn't allow giving karma for this kind of node types"), 0 );
+  }
+  
+  // Vote out of range: RETURN with error
+  $accepted_range_plus = extra_voting_forms_range_calculator($o->sk_type, 'plus', $account);
+  $accepted_range_minus = extra_voting_forms_range_calculator($o->sk_type, 'minus', $account);
+  if ($vote > $accepted_range_plus || $vote < $accepted_range_minus ) {
+    return array( t('Your vote was outside the acceptable range!'), 0 );
+  }
+  
+  // Is only one vote allowed?
+  $only_one_vote_allowed = variable_get('extra_voting_forms_only_one_vote', FALSE);
+  $criteria = array();
+  $criteria['content_type'] = extra_voting_forms_c($o->sk_type);
+  $criteria['content_id'] = $o->sk_id;
+  $criteria['value_type'] = 'points';
+  $criteria['tag'] = 'vote';
+  $criteria['uid'] = $account->uid;
+
+  $existing_vote_cast = votingapi_select_votes($criteria);
+  $existing_vote = (int)$existing_vote_cast[0]['value'];
+
+  if ($only_one_vote_allowed && ! user_access('voting administrator', $account) && $existing_vote != 0) {
+    return array( t('You can only vote once!'), 0 );
+  }
+
+  // Check the time limit on the voting form
+  if ($o->sk_type == 'c') {
+    $t = $o->timestamp;
+  }
+  else {
+    $t = $o->created;
+  }
+  $time_limit = variable_get('extra_voting_forms_vote_within_hours_'. $o->sk_type, 0);
+  if ($time_limit && ! user_access('voting administrator', $account) ) {
+    $cutoff_time = (time() - $time_limit * 60 * 60);
+    if ($t < $cutoff_time) {
+      return array( t('This element no longer accepts votes!'), 0 );
+    }
+  }
+
+  // Only check for abuse if the user is not allowed to bypass the
+  // anti-abuse system
+  if (! user_access('bypass voting anti-abuse system', $account) ) {
+    // Anti-abuse: check that the person's threshhold hasn't been
+    // reached IN GENERAL
+    if ( extra_voting_forms_too_many_votes_total($vote, $account)) {
+      return array( t('Your have already given too many karma points for now!'), 0 );
+    }
+
+    // Anti-abuse: check that the person hasn't cast too many raw votes
+    if (extra_voting_forms_too_many_votes_cast($account)) {
+      return array( t('Your have already cast enough votes for now!'), 0 );
+    }
+  }
+
+  // Give the actual vote using the Voting API 
+  $votes = array();
+  $votes['content_type'] = extra_voting_forms_c($o->sk_type);
+  $votes['content_id'] = $o->sk_id;
+  $votes['uid']  = $account->uid;
+  $votes['value_type'] = 'points';
+  $votes['value'] = $vote;
+  $result = votingapi_set_votes($votes);
+
+  // Get the current number of votes
+  $criteria = array();
+  $criteria['content_type'] = extra_voting_forms_c($o->sk_type);
+  $criteria['content_id'] = $o->sk_id;
+  $criteria['tag'] = 'vote';
+  $criteria['value_type'] = 'points';
+  $criteria['function'] = 'sum';
+
+  $r = votingapi_select_results($criteria);
+  $r = (int)$r[0]['value'];
+  return array('', $r);
+}
+
+function extra_voting_forms_c($sk_type) {
+  return $sk_type == 'n' ? 'node' : 'comment';
+}
+
+/**
+ * What it does depends largely on $form_type:
+ *
+ * - If $form_type is "ajax", then it returns either:
+ *   -- {"karma_aggregate":$current_karma, "error":"$error"} (ERRORS)
+ *    -- {"karma_aggregate":$current_karma} (ALL OK)
+ *
+ * - If $form_type is "form", then it redirects to the right 
+ *   page that held $comment, after setting the error using
+ *    drupal_set_message('...','error')
+ *   
+ * @param $form_type
+ *   'ajax' or 'form'
+ * @param $object
+ *   The object. It's used to know where to go
+ * @param $error
+ *   The error. All good if ''
+ * @return
+ *   A redirection to the right node if $form_type is 'form', OR
+ *   just a string (no page templates) if $form_type is 'ajax'
+ */
+function extra_voting_forms_return($form_type, $object, $error, $current_karma) {
+  if ($form_type == 'ajax') {
+    // Adjust the string for Ajax...
+    if ($current_karma === '') {
+      $current_karma = '"Undefined"';
+    }
+
+    // Return the right thing to the javascript
+    if ($error != '') {
+      return "{\"karma_aggregate\":$current_karma, \"error\":\"$error\"}";
+      //drupal_set_message($error);
+    }
+    else {
+      return "{\"karma_aggregate\":$current_karma}";
+    }
+  }
+  else {
+    if ($error != '') {
+      drupal_set_message($error, 'error');
+    }
+    else {
+      drupal_set_message(t('Thank you for voting!'));
+    }
+    drupal_goto(referer_uri());
+  }
+}
+
+function extra_voting_forms_anonymous_url() {
+
+  // Set where the user should be redirected
+  $anonymous_url = variable_get('extra_voting_forms_anonymous_url', '');
+
+  if ($anonymous_url != '') {
+    // The anonymous URL redirect is selected by the user
+    $redirect_url = $anonymous_url;
+  }
+  else {
+    // Use the default user/login URL
+    // Note: I want a clean URL, without leading "/"
+    $redirect_url = substr(url("user/login"), 1);
+  }    
+  return $redirect_url;
+}
+
+// TODO: DOCUMENT/PLACE THIS FUNCTION
+function extra_voting_forms_destination($o) {
+  // Define the destination variable
+  if ($o->sk_type == 'n') {
+    //$destination= url('node/'. $o->sk_id);
+	$destination = 'node/'. $o->sk_id;
+  }
+  else {
+    $options = array();
+    $options['fragment'] = 'comment-'. $o->sk_id;
+    //$destination=url('node/'. $o->nid,$options);
+	$destination = 'node/'. $o->sk_id;
+  }
+  //$destination = substr($destination, 1);
+  return urlencode($destination);
+}
+
+// TODO: DOCUMENT AND PLACE THIS FUNCTION
+function extra_voting_forms_js_destination_field($o) {
+  return "<input type=\"hidden\" name=\"js_destination\" value=\"". extra_voting_forms_destination($o) ."\" />";
+}
+
+
+function  extra_voting_forms_get_form_1_2_options($style,$range_plus,$range_minus, $existing_vote){
+
+  // Form Style 2 Negatives only
+  if ($style == 2) {
+    $range_plus = -0;
+  }
+      
+  // If this config flag is on, then it won't show the
+  // vote given while reloading the form.
+  $hiding_select_vote = FALSE;
+  if ( variable_get('extra_voting_forms_hide_given_select_votes', FALSE) && $existing_vote ) {
+    $existing_vote = 0;
+    $hiding_select_vote = TRUE;
+  }
+	  
+  // Build option list, check for selected
+  for ($i = $range_plus; $i >= $range_minus; $i--) {
+    // Create teh $select variable
+    $selected = '';
+    if ($i == $existing_vote) {
+      $selected = " selected ";
+    }
+    // Create the $vote_description variable
+    $vote_description = variable_get('extra_voting_forms_explanation_'. $i, '');
+
+    // Adds to the description of "0" if a vote had already been cast
+    // and the system is not allowed to show the vote
+    if ($i == 0 && $hiding_select_vote) {
+      $vote_description .= t(' - Already voted');
+    }
+
+    // Adds the option
+    $options .= '<option value="'. $i .'"'. $selected .'>'. $i .' '. $vote_description .'</option>';
+  }
+  return $options;
+}
+
+/**
+ * It display the karma form for a particular comment. This is used
+ * both by the hook_link (in case the form needs to be in the links) and
+ * by the user directly (so that he can place the form somewhere in the
+ * comment template if s/he wants to).
+ *
+ * @param $o
+ *   The object. It could be a node or a comment. The extra attribute
+ *   sk_id and sk_type help in this sense.
+ * @param $force_type
+ *   Force the function to assign the extra sk_fields according to
+ *   the given type.
+ * @ param $style
+ *   Which style of form will be returned
+ * @ param $substyle
+ *   Which substyle of form will be returned. It can be "big" or "small"
+ *
+ * @return
+ *   The form. It checks if the comment had been buried - if so, returns
+ *   nothing.
+ */
+function extra_voting_forms_show_form($o, $force_type, $style = 1, $substyle = 'big') {
+  global $user;
+
+  // Important so that the theme's default is not applied
+  $voting_not_allowed_flag = FALSE;
+
+  // Sets the right "extra sk variables" for the object according to the
+  // forced type
+  if ($force_type == 'c') {
+    $o->sk_id   = $o->cid;
+    $o->sk_type = 'c';
+  }
+  else {
+    $o->sk_id   = $o->nid;
+    $o->sk_type = 'n';
+  }
+  
+  // Just a small sanity check on the form style
+  if ($substyle != 'big' && $substyle != 'small') {
+    $substyle = "big";
+  }
+
+  // Define $form_style. If a parameter was passed, use the parameter.
+  // Otherwise, get the style from the global variables
+  // $form_style = $style .'_'. $substyle;
+
+  // ****************************************************************
+  // ** CHECK THAT THE FORM ACTUALLY NEEDS TO COME OUT
+  // ****************************************************************
+  // Modules can actually turn off the displaying of any forms
+  //
+  global $extra_voting_forms_HIDE;
+  
+  if ($extra_voting_forms_HIDE) {
+    return;
+  }  
+
+  // To avoid nested form not working in IE and Opera
+  // we do not display karma comment voting on preview
+  if ($o->sk_id == 0 && $o->sk_type == 'c') {
+    return;
+  }
+
+  // The module is set so that it doesn't give the ability to vote
+  // based on comments. Don't return the form.
+  if ($o->sk_type == 'c' && !variable_get('extra_voting_forms_allow_karma_for_comments', FALSE)) {
+    return '';
+  }
+  
+  // The module is set so that it doesn't give the ability to vote
+  // based on this particulat note type. Don't return the form.
+  $types = variable_get('extra_voting_forms_node_types_applied', array() );
+  if ($o->sk_type == 'n' && ! $types[$o->type] ) {
+    return '';
+  }
+  
+  // Don't offer the form if the comment is the user's AND the user is not
+  // a karma administrator or "admin"
+  if ($o->sk_type == 'c' && $user->uid == $o->uid && $user->uid != 1 && ! user_access('voting administrator')) {
+    $voting_not_allowed_flag=TRUE;
+  }
+
+  // ****************************************************************
+  // ** SET THE BASIC VARIABLES
+  // ****************************************************************
+  // This will get the record. If != NULL, then a vote (even 0) WAS cast
+  $criteria = array();
+  $criteria['content_type'] = extra_voting_forms_c($o->sk_type); 
+  $criteria['content_id'] = $o->sk_id;
+  $criteria['value_type'] = 'points';
+  $criteria['tag'] = 'vote';
+  $criteria['uid'] = $user->uid;
+  $existing_vote_cast = votingapi_select_votes($criteria);
+
+  // Integer representation of the vote
+  $existing_vote = (int)$existing_vote_cast[0]['value'];
+  // If only one vote is allowed, and a vote has already been cast, then
+  // set the variable "voting_not_allowed" which will be used in the form
+  $only_one_vote_allowed = variable_get('extra_voting_forms_only_one_vote', FALSE);
+
+  if ($only_one_vote_allowed && ! user_access('voting administrator') && $existing_vote_cast) {
+    $voting_not_allowed_flag = TRUE;
+  }
+ 
+  // The user does not have voting rights: RETURN with error
+  if (!user_access('give points with extra voting forms')) {
+    $voting_not_allowed_flag = TRUE;
+  }
+ 
+  // Voting is "sort of" allowed to anonymous...! 
+  // The voter will be redirected...
+  $draw_js_destination_variable_flag = FALSE;
+  if ($user->uid == 0) {
+    $voting_not_allowed_flag = FALSE;
+    $draw_js_destination_variable_flag = TRUE;
+  }
+
+  // Don't allow showing the form past its time limit
+  if ($o->sk_type == 'c') {
+    $t = $o->timestamp;
+  }
+  else {
+    $t = $o->created;
+  }
+
+  $time_limit = variable_get('extra_voting_forms_vote_within_hours_'. $o->sk_type, 0);
+  if ($time_limit && !user_access('voting administrator') ) {
+    $cutoff_time = (time() - $time_limit * 60 * 60);
+    if ($t < $cutoff_time) {
+      $voting_not_allowed_flag = TRUE;
+    }
+  }
+
+  // Set up the range
+  $range_plus = extra_voting_forms_range_calculator($o->sk_type, 'plus'); 
+  $range_minus = extra_voting_forms_range_calculator($o->sk_type, 'minus'); 
+
+  // Set the default value. Note: the range might have gone down
+  // since the last vote. So, check it
+  $existing_vote = $existing_vote;
+  if ($existing_vote < $range_minus) {
+    $existing_vote = $range_minus;
+  }
+  if ($existing_vote > $range_plus) {
+    $existing_vote = $range_plus;
+  }
+
+  // The variable "total_score_display" will be FALSE if the
+  // existing karma is not to be shown, and TRUE otherwise
+  if ( variable_get('extra_voting_forms_display_karma_for_'. $o->sk_type, 0)) {
+    // If the node doesn't have an ID, then voting is not allowed and
+    // the existing vote is 1. This
+    // is here because forms can be in the "preview" bit of the deal...!
+    // Note: this needs to be a last-minute thing...
+    if ($o->sk_id == 0) {
+      $voting_not_allowed_flag = TRUE;
+      $total_score_display = 1;  
+    }
+    else {
+      $criteria = array();
+      $criteria['content_type'] = extra_voting_forms_c($o->sk_type); 
+      $criteria['content_id'] = $o->sk_id;
+      $criteria['value_type'] = 'points';
+      $criteria['tag'] = 'vote';
+      $criteria['function'] = 'sum';
+      $r = votingapi_select_results($criteria);
+
+      $total_score_display = (int)$r[0]['value'];
+    }
+  }
+  else {
+    $total_score_display = FALSE;
+  }
+
+  switch ($style) {
+    // Form type 1 (Karma Vote Up/Down, multiple values)
+    case 1:
+    // Form type 2 (Karma Vote Down, multiple values)
+    case 2:
+      $options=extra_voting_forms_get_form_1_2_options($style,$range_plus,$range_minus, $existing_vote);
+
+      $form .= theme('extra_voting_forms_'.$style, $substyle, $o, $total_score_display, $existing_vote, $voting_not_allowed_flag, $draw_js_destination_variable_flag, $options);
+      break;
+    // Form type 3 (Karma UP/Down)
+    case 3:
+      $form .= theme('extra_voting_forms_3', $substyle, $o, $total_score_display, $existing_vote, $voting_not_allowed_flag, $draw_js_destination_variable_flag);
+      break;
+    // Form type 4 (Karma UP only)
+    case 4:
+      $form .= theme('extra_voting_forms_4', $substyle, $o, $total_score_display, $existing_vote, $voting_not_allowed_flag, $draw_js_destination_variable_flag);
+      break;
+  }
+  // Make up the finished form
+  return $form;
+}
+
+/**
+ * Helper function to work out a person's range based on the extra
+ * permissions
+ *
+ * @return
+ *   The range
+ */
+function extra_voting_forms_range_calculator($type, $plus_or_minus, $account = NULL) {  
+  global $user;
+
+  // Check which account to vote from
+  if ($account == NULL) {
+    $account = $user;
+  }
+  // Check the parameters
+  if ($type != 'c' && $type != 'n') {
+    return 0;
+  }
+  if ($plus_or_minus != 'plus' && $plus_or_minus != 'minus') {
+    return 0;
+  }
+  
+  $range = 0;
+  $range += variable_get("extra_voting_forms_range_users_${plus_or_minus}_$type", 0);
+  if (user_access('voting vote bonus', $account)) {
+    $range += variable_get("extra_voting_forms_vote_bonus_${plus_or_minus}_$type", 0);
+  }
+  if (user_access('voting administrator', $account)) {
+    $range += variable_get("extra_voting_forms_vote_bonus_admin_${plus_or_minus}_$type", 0);
+  }
+
+  // Return a negative range if "minus" was requested
+  if ($plus_or_minus == 'minus') {
+    $range = $range * -1;
+  }
+  
+  //drupal_set_message("Requested: $type, $plus_or_minus ; Returned: $range");
+  return $range;
+}
+
+
+/* **************************************************************
+ *                       *** END OF ***
+ *       FUNCTIONS TO MANAGE THE ACTUAL VOTING PROCESS
+ *
+ * **************************************************************
+*/
+/* **************************************************************
+ *                        *** BEGIN ***
+ *                       THEME FUNCTIONS
+ * **************************************************************
+*/
+/**
+ * Return a themed select voting form for styles 1
+ *
+ * @ingroup themeable
+ */
+function theme_extra_voting_forms_1($substyle, $o, $total_score_display, $existing_vote, $voting_not_allowed_flag, $draw_js_destination_variable_flag, $options) {
+
+  // **********************************************************
+  // PREPARING BASIC VARIABLES
+  // **********************************************************
+
+  if ($voting_not_allowed_flag) {
+    $voting_not_allowed_str = ' disabled="disabled" ';
+  }
+  // Set the action
+  $action = base_path() ."extra_voting_forms/handle";
+
+  if ($total_score_display !== FALSE ) {
+    $karma_score_display = '<span class="karma_score">'. $total_score_display .'</span>';
+  }
+
+ // This will be attached to the form's style
+  if ($o->promote) {
+    $is_promoted_class = '_promoted';
+  }
+
+  if ($existing_vote < 0) {
+    $negative_karma_str = '<div class="has_negative_karma"></div>';
+  }
+
+  if( $draw_js_destination_variable_flag ){
+    $destination_variable_str = extra_voting_forms_js_destination_field($o,$draw_js_destination_variable);
+  }
+
+  // **********************************************************
+  // DRAW THE ACTUAL FORM
+  // **********************************************************
+
+  $form .= '
+    <div class="extra_voting_forms karma_1_'.$substyle.'">
+    <form action="'.$action.'" method="post" class="karma_form'.$is_promoted_class.'" id="z'.$o->sk_id.'">
+      <div>
+        '.$negative_karma_str.'
+        '.$karma_score_display.'
+        <span class="karma_buttons">
+          <select name="karma_vote" '.$voting_not_allowed_str.'>'
+            .$options.'
+          </select>
+          <input type="hidden" name="oid" value="'.$o->sk_id.'"/>
+          <input type="hidden" name="otype" value="'.$o->sk_type.'"/>
+          <input type="hidden" name="form_style" value="1"/>
+          <input type="hidden" name="form_type" value="form"/>
+          <input type="submit" name="submit" value="Vote" '.$voting_not_allowed_str.'/>
+          '.$destination_variable_str.'
+        </span>
+      </div>
+    </form>
+    </div>';
+  return $form;
+}
+
+/**
+ * Return a themed select voting form for styles 2
+ *
+ * @ingroup themeable
+ */
+function theme_extra_voting_forms_2($substyle, $o, $total_score_display, $existing_vote, $voting_not_allowed_flag, $draw_js_destination_variable_flag, $options ) {
+
+  // **********************************************************
+  // PREPARING BASIC VARIABLES
+  // **********************************************************
+
+  if ($voting_not_allowed_flag) {
+    $voting_not_allowed_str = ' disabled="disabled" ';
+  }
+  // Set the action
+  $action = base_path() ."extra_voting_forms/handle";
+
+  if ($total_score_display !== FALSE ) {
+    $karma_score_display = '<span class="karma_score">'. $total_score_display .'</span>';
+  }
+
+ // This will be attached to the form's style
+  if ($o->promote) {
+    $is_promoted_class = '_promoted';
+  }
+
+  if ($existing_vote < 0) {
+    $negative_karma_str = '<div class="has_negative_karma"></div>';
+  }
+
+  if( $draw_js_destination_variable_flag ){
+    $destination_variable_str = extra_voting_forms_js_destination_field($o,$draw_js_destination_variable);
+  }
+
+  // **********************************************************
+  // DRAW THE ACTUAL FORM
+  // **********************************************************
+
+  $form .= '
+    <div class="extra_voting_forms karma_2_'.$substyle.'">
+    <form action="'.$action.'" method="post" class="karma_form'.$is_promoted_class.'" id="y'.$o->sk_id.'">
+      <div>
+        '.$negative_karma_str.'
+        '.$karma_score_display.'
+        <span class="karma_buttons">
+          <select name="karma_vote" '.$voting_not_allowed_str.'>'
+            .$options.'
+          </select>
+          <input type="hidden" name="oid" value="'.$o->sk_id.'"/>
+          <input type="hidden" name="otype" value="'.$o->sk_type.'"/>
+          <input type="hidden" name="form_style" value="2"/>
+          <input type="hidden" name="form_type" value="form"/>
+          <input type="submit" name="submit" value="Vote" '.$voting_not_allowed_str.'/>
+          '.$destination_variable_str.'
+        </span>
+      </div>
+    </form>
+    </div>';
+  return $form;
+}
+
+/**
+ * Return a themed 2 button up/down voting form
+ *
+ * @ingroup themeable
+ */
+function theme_extra_voting_forms_3($substyle, $o, $total_score_display, $existing_vote, $voting_not_allowed_flag, $draw_js_destination_variable_flag ) {
+
+  // **********************************************************
+  // PREPARING BASIC VARIABLES
+  // **********************************************************
+
+  if ($voting_not_allowed_flag) {
+    $voting_not_allowed_str = ' disabled="disabled" ';
+    $clickable_string = '_not_clickable';
+  }
+  else {
+    $clickable_string = '_clickable';
+  }
+  // Set the action
+  $action = base_path() ."extra_voting_forms/handle";
+
+  if ($total_score_display !== FALSE ) {
+    $karma_score_display = '<span class="karma_score">'. $total_score_display .'</span>';
+  }
+
+  // This will be attached to the form's style
+  if ($o->promote) {
+    $is_promoted_class = '_promoted';
+  }
+
+  if ($existing_vote < 0) {
+    $negative_karma_str = '<div class="has_negative_karma"></div>';
+  }
+
+  if( $draw_js_destination_variable_flag ){
+    $destination_variable_str = extra_voting_forms_js_destination_field($o,$draw_js_destination_variable);
+  }
+
+  // Work out up and down voting amounts
+  $up_vote_amount = variable_get('extra_voting_forms_updown_voting_up_'.$o->sk_type, '');
+  $down_vote_amount = variable_get('extra_voting_forms_updown_voting_down_'.$o->sk_type, '');
+
+
+  // **********************************************************
+  // DRAW THE ACTUAL FORM
+  // **********************************************************
+
+  $form .= '
+    <div class="extra_voting_forms karma_3_'.$substyle.'">
+    <form action="'.$action.'" method="post" class="karma_form'.$is_promoted_class.'" id="x'.$o->sk_id.'">
+      <div>
+        '.$negative_karma_str.'
+        '.$karma_score_display.'
+        <span class="karma_buttons">
+          <label class="karma_up'.($existing_vote>0?'_clicked':'_not_clicked').$clickable_string.'" for="u'.$o->sk_id.'">
+            <input id="u'.$o->sk_id.'" type="radio" name="karma_vote" value="'.$up_vote_amount.'"'.($existing_vote>0?' checked="checked"':'').'/>
+            <span>Up</span>
+          </label>
+          <label class="karma_down'.($existing_vote<0?'_clicked':'_not_clicked').$clickable_string.'" for="d'.$o->sk_id.'">
+            <input id="d'.$o->sk_id.'" type="radio" name="karma_vote" value="'.$down_vote_amount.'"'.($existing_vote<0?' class="karma_clicked" checked="checked"':'').'/>
+            <span>Down</span>
+          </label>
+          <input type="hidden" name="oid" value="'.$o->sk_id.'"/>
+          <input type="hidden" name="otype" value="'.$o->sk_type.'"/>
+          <input type="hidden" name="form_style" value="3"/>
+          <input type="hidden" name="form_type" value="form"/>
+          <input type="submit" name="submit" value="Vote" '.$voting_not_allowed_str.'/>
+          '.$destination_variable_str.'
+        </span>
+      </div>
+    </form></div>';
+  return $form;
+}
+
+/**
+ * Return a themed 1 button voting form
+ *
+ * @ingroup themeable
+ */
+function theme_extra_voting_forms_4($substyle, $o, $total_score_display, $existing_vote, $voting_not_allowed_flag, $draw_js_destination_variable_flag ) {
+
+  // **********************************************************
+  // PREPARING BASIC VARIABLES
+  // **********************************************************
+
+  if ($voting_not_allowed_flag) {
+    $voting_not_allowed_str = ' disabled="disabled" ';
+    $clickable_string = '_not_clickable';
+  }
+  else {
+    $clickable_string = '_clickable';
+  }
+  // Set the action
+  $action = base_path() ."extra_voting_forms/handle";
+
+  if ($total_score_display !== FALSE ) {
+    $karma_score_display = '<span class="karma_score">'. $total_score_display .'</span>';
+  }
+
+  // This will be attached to the form's style
+  if ($o->promote) {
+    $is_promoted_class = '_promoted';
+  }
+
+  if ($existing_vote < 0) {
+    $negative_karma_str = '<div class="has_negative_karma"></div>';
+  }
+
+  if( $draw_js_destination_variable_flag ){
+    $destination_variable_str = extra_voting_forms_js_destination_field($o,$draw_js_destination_variable);
+  }
+
+  // Work out up and down voting amounts
+  $up_vote_amount = variable_get('extra_voting_forms_updown_voting_up_'.$o->sk_type, '');
+
+  // **********************************************************
+  // DRAW THE ACTUAL FORM
+  // **********************************************************
+
+  $form .= '
+    <div class="extra_voting_forms karma_4_'.$substyle.'">
+    <form action="'.$action.'" method="post" class="karma_form'.$is_promoted_class.'" id="w'.$o->sk_id.'">
+      <div>
+        '.$negative_karma_str.'
+        '.$karma_score_display.'
+        <span class="karma_buttons">
+          <label class="karma_up'.($existing_vote>0?'_clicked':'_not_clicked').$clickable_string.'" for="u'.$o->sk_id.'">
+           <input id="u'.$o->sk_id.'" type="radio" name="karma_vote" value="'.$up_vote_amount.'"/>
+            <span>Up</span>
+          </label>
+          <input type="hidden" name="oid" value="'.$o->sk_id.'"/>
+          <input type="hidden" name="otype" value="'.$o->sk_type.'"/>
+          <input type="hidden" name="form_style" value="4"/>
+          <input type="hidden" name="form_type" value="form"/>
+          <input type="submit" name="submit" value="Vote" '.$voting_not_allowed_str.'/>
+          '.$destination_variable_str.'
+        </span>
+      </div>
+    </form></div>';
+  return $form;
+}
+
+/* **************************************************************
+ *                        *** END OF ***
+ *                        THEME FUNCTIONS
+ * **************************************************************
+*/
+/**
+ * Implementation of hook_theme().
+ */
+function extra_voting_forms_theme() {
+
+  // Some defaults so that it looks OK even though the theme() hook
+  // is called directly :-D
+  $options = '';
+  $options .= '<option value="0">Use  extra_voting_forms_show_form()!</option>';
+
+  return array(
+    'extra_voting_forms_1' => array(
+      'arguments' => array(
+        'substyle' => 'big',
+        'o' => NULL,
+        'total_score_display' => FALSE,
+        'existing_vote' => 0,
+        'voting_not_allowed_flag' => TRUE,
+        'draw_js_destination_variable_flag ' => FALSE,
+        'options' => $options,
+      ),
+    ),
+    
+    'extra_voting_forms_2' => array(
+      'arguments' => array(
+        'substyle' => 'big',
+        'o' => NULL,
+        'total_score_display' => FALSE,
+        'existing_vote' => 0,
+        'voting_not_allowed_flag' => TRUE,
+        'draw_js_destination_variable_flag ' => FALSE,
+        'options' => $options,
+      ),
+    ),
+
+    'extra_voting_forms_3' => array(
+      'arguments' => array(
+        'substyle' => 'big',
+        'o' => NULL,
+        'total_score_display' => FALSE,
+        'existing_vote' => 0,
+        'voting_not_allowed_flag' => TRUE,
+        'draw_js_destination_variable_flag ' => FALSE,
+      ),
+    ),
+    'extra_voting_forms_4' => array(
+      'arguments' => array(
+        'substyle' => 'big',
+        'o' => NULL,
+        'total_score_display' => FALSE,
+        'existing_vote' => 0,
+        'voting_not_allowed_flag' => TRUE,
+        'draw_js_destination_variable_flag ' => FALSE,
+      ),
+    ),
+  );
+}

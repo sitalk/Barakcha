@@ -1,0 +1,11 @@
+name = Simple vote
+description = Allows a multitag voting system
+package = Voting
+core = 7.x
+files[] = simplevote.module
+dependencies[] = votingapi
+
+; Information added by drupal.org packaging script on 2012-03-29
+version = "1.0"
+datestamp = "1332980461"
+

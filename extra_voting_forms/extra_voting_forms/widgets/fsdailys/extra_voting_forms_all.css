@@ -1,0 +1,128 @@
+/* Nodes */
+.karma_3_big {
+  display: block;
+  width: 50px;
+  float: left;
+}
+.karma_3_big .karma_score {
+  display: block;
+  width: 50px;
+  height: 40px;
+  line-height: 40px;
+  font-size: 14pt;
+  letter-spacing: -1px;
+  text-align: center;
+  background-position: top left;
+  background-repeat: no-repeat;
+}
+.karma_3_big .karma_form .karma_score {
+  background-image: url("img/node_scorebg_upcoming.gif");
+  color: #fff;
+  text-shadow: 0 -2px 0 rgba(0,0,0,0.5);
+}
+.karma_3_big .karma_form_promoted .karma_score {
+  background-image: url("img/node_scorebg_published.gif");
+  color: #630;
+  text-shadow: 0 2px 0 #fff;
+}
+.karma_3_big .karma_buttons label {
+  display: block;
+  font-size: 8pt;
+}
+
+/* Comments */
+.comment .karma_3_small {
+  float: right;
+  width: auto;
+}
+.comment .karma_3_small * {
+  display: block;
+  float: left;
+}
+.comment .karma_3_small form {
+  line-height: 18px;
+  vertical-align: middle;
+}
+.comment .karma_3_small .karma_score {
+  width: 30px;
+  padding-left: 5px;
+  padding-right: 35px;
+  height: 18px;
+  line-height: 18px;
+  margin-right: 2px;
+  font-size: 9pt;
+  text-align: center;
+  background: url("img/comment_scorebg.gif") no-repeat top left;
+  color: #fff;
+  text-shadow: 0 -2px 0 rgba(0,0,0,0.5);
+}
+.comment .karma_3_small .karma_buttons {
+  margin-top: 0;
+  height: 18px;
+  line-height: 18px;
+}
+
+
+/* The following styles are only applied when JavaScript is enabled:
+============================================================================ */
+
+/* Base */
+/* Visual feedback while a form is waiting submission. */
+html.js .karma_sending {
+  opacity: 0.3;
+  filter: alpha(opacity=30);
+  width: 100%;
+  height: 100%;
+}
+
+/* Nodes */
+html.js .karma_3_big input { display: none; }
+html.js .karma_3_big .karma_buttons {
+  display: block;
+  margin-top: 1px;
+  height: 14px;
+}
+html.js .karma_3_big .karma_buttons label {
+  float: left;
+  width: 25px;
+  height: 14px;
+  background-position: top left;
+  background-repeat: no-repeat;
+  text-indent: -1000em;
+  cursor: pointer;
+}
+html.js .karma_3_big .karma_buttons label.karma_up_not_clicked_not_clickable,
+html.js .karma_3_big .karma_buttons label.karma_up_clicked_not_clickable,
+html.js .karma_3_big .karma_buttons label.karma_down_not_clicked_not_clickable,
+html.js .karma_3_big .karma_buttons label.karma_down_clicked_not_clickable { cursor: default; }
+
+html.js .karma_3_big .karma_buttons label.karma_up_not_clicked_clickable { background-image: url("img/node_voteup_enabled_notclicked.gif"); }
+html.js .karma_3_big .karma_buttons label.karma_up_clicked_clickable { background-image: url("img/node_voteup_enabled_clicked.gif"); }
+html.js .karma_3_big .karma_buttons label.karma_up_not_clicked_not_clickable { background-image: url("img/node_voteup_disabled_notclicked.gif"); }
+html.js .karma_3_big .karma_buttons label.karma_up_clicked_not_clickable { background-image: url("img/node_voteup_disabled_clicked.gif"); }
+html.js .karma_3_big .karma_buttons label.karma_down_not_clicked_clickable { background-image: url("img/node_votedown_enabled_notclicked.gif"); }
+html.js .karma_3_big .karma_buttons label.karma_down_clicked_clickable { background-image: url("img/node_votedown_enabled_clicked.gif"); }
+html.js .karma_3_big .karma_buttons label.karma_down_not_clicked_not_clickable { background-image: url("img/node_votedown_disabled_notclicked.gif"); }
+html.js .karma_3_big .karma_buttons label.karma_down_clicked_not_clickable { background-image: url("img/node_votedown_disabled_clicked.gif"); }
+
+html.js .karma_3_big .karma_buttons label span { display: none; }
+
+/* Comments */
+html.js .comment .karma_3_small input { display: none; }
+html.js .comment .karma_3_small .karma_buttons { overflow: hidden; }
+html.js .comment .karma_3_small .karma_buttons label {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  text-indent: -1000em;
+  overflow: hidden;
+  cursor: pointer;
+}
+html.js .comment .karma_3_small .karma_buttons label.karma_up_not_clicked_clickable { background-image: url("img/comment_voteup_enabled_notclicked.gif"); }
+html.js .comment .karma_3_small .karma_buttons label.karma_up_clicked_clickable { background-image: url("img/comment_voteup_enabled_clicked.gif"); }
+html.js .comment .karma_3_small .karma_buttons label.karma_up_not_clicked_not_clickable { background-image: url("img/comment_voteup_disabled_notclicked.gif"); cursor: default; }
+html.js .comment .karma_3_small .karma_buttons label.karma_up_clicked_not_clickable { background-image: url("img/comment_voteup_disabled_clicked.gif"); cursor: default; }
+html.js .comment .karma_3_small .karma_buttons label.karma_down_not_clicked_clickable { background-image: url("img/comment_votedown_enabled_notclicked.gif"); }
+html.js .comment .karma_3_small .karma_buttons label.karma_down_clicked_clickable { background-image: url("img/comment_votedown_enabled_clicked.gif"); cursor: default; }
+html.js .comment .karma_3_small .karma_buttons label.karma_down_not_clicked_not_clickable { background-image: url("img/comment_votedown_disabled_notclicked.gif"); cursor: default; }
+html.js .comment .karma_3_small .karma_buttons label.karma_down_clicked_not_clickable { background-image: url("img/comment_votedown_disabled_clicked.gif"); cursor: default; }

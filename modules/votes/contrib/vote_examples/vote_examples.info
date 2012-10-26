@@ -1,0 +1,7 @@
+name = Vote Examples
+description = Vote Examples
+package = Voting
+core = 7.x
+version = 7.x-1.x-dev
+dependencies[] = vote
+dependencies[] = vote_defaults

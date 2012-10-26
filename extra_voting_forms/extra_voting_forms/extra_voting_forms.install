@@ -1,0 +1,54 @@
+<?php
+
+/**
+ * Implementation of hook_install().
+ */ 
+function extra_voting_forms_install() {}
+
+
+/**
+ * Implementation of hook_uninstall().
+ */ 
+function extra_voting_forms_uninstall() {
+  variable_del('extra_voting_forms_widget_dir');
+  variable_del('extra_voting_forms_widget_dir_in_themes');
+  variable_del('extra_voting_forms_node_types_applied');
+  variable_del('extra_voting_forms_allow_karma_for_comments');
+  variable_del('extra_voting_forms_anonymous_url');
+  variable_del('extra_voting_forms_display_in_node_link');
+  variable_del('extra_voting_forms_display_in_node_link_style');
+  variable_del('extra_voting_forms_display_in_comment_link');
+  variable_del('extra_voting_forms_display_in_comment_link_style');
+  variable_del('extra_voting_forms_only_one_vote');
+  variable_del('extra_voting_forms_hide_given_select_votes');
+  variable_del('extra_voting_forms_vote_within_hours_n');
+  variable_del('extra_voting_forms_vote_within_hours_c');
+  variable_del('extra_voting_forms_range_users_plus_n');
+  variable_del('extra_voting_forms_range_users_minus_n');
+  variable_del('extra_voting_forms_range_users_plus_c');
+  variable_del('extra_voting_forms_range_users_minus_c');
+  variable_del('extra_voting_forms_vote_bonus_admin_minus_n');
+  variable_del('extra_voting_forms_vote_bonus_admin_plus_n');
+  variable_del('extra_voting_forms_vote_bonus_minus_n');
+  variable_del('extra_voting_forms_vote_bonus_plus_n');
+  variable_del('extra_voting_forms_vote_bonus_admin_plus_c');
+  variable_del('extra_voting_forms_vote_bonus_admin_plus_c');
+  variable_del('extra_voting_forms_vote_bonus_minus_c');
+  variable_del('extra_voting_forms_vote_bonus_plus_c');
+  variable_del('extra_voting_forms_updown_voting_up_n');
+  variable_del('extra_voting_forms_updown_voting_down_n');
+  variable_del('extra_voting_forms_updown_voting_up_c');
+  variable_del('extra_voting_forms_updown_voting_down_c');
+  variable_del('extra_voting_forms_abuse_raw_votes');
+  variable_del('extra_voting_forms_abuse_raw_votes_every');
+  variable_del('extra_voting_forms_abuse_total_points');
+  variable_del('extra_voting_forms_abuse_total_every');
+
+  for ($i = -6; $i <= 6; $i++) {
+    variable_del('extra_voting_forms_explanation_'.$i);
+  }
+
+  variable_del('extra_voting_forms_display_karma_for_n');
+  variable_del('extra_voting_forms_display_karma_for_c');
+}
+

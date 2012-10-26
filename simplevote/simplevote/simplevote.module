@@ -1,0 +1,205 @@
+<?php
+
+/**
+ * @file
+ * A demonstration of VotingAPI.
+ */
+
+function simplevote_menu($may_cache) {
+  theme('add_style', theme('simplevote_css_path'));
+  $items = array();
+  if ($may_cache) {
+    $items[] = array('path' => 'vote', 'title' => t('vote on content'),
+        'callback' => 'simplevote_vote', 'access' => true, 'type' => MENU_CALLBACK);
+  }
+  return $items;
+}
+
+function simplevote_help($section) {
+  switch ($section) {
+    case 'admin/modules#description':
+      return t('Adds a five-star vote widget to every node and comment.');
+      break;
+  } 
+}
+
+function simplevote_vote($type, $cid, $value) {
+  // sanity-check the incoming values.
+  if (is_numeric($cid) && is_numeric($value)) {
+    if ($value > 100) {
+      $value = 100;
+    }
+
+    $vote->value = $value;
+    $vote->value_type = 'percent';
+    $vote->tag = VOTINGAPI_VALUE_DEFAULT_TAG;
+
+    votingapi_set_vote($type, $cid, $vote);
+  }
+  drupal_goto(drupal_get_destination());
+}
+
+function theme_simplevote_widget($cid, $type) {
+  // Get the current vote. It should come in as a percentage,
+  $vote = votingapi_get_voting_result($type, $cid, 'percent', VOTINGAPI_VALUE_DEFAULT_TAG, 'average');
+
+  if ($vote) {
+    $stars = round($vote->value);
+  }
+  else {
+    $stars = 0;
+  }
+
+  $output = '<div class="simplevote_widget">' . t("Rating");
+  for ($i = 20; $i <= 100; $i += 20) {
+    $output .= theme('simplevote_icon', $type, $cid, $i, $stars >= $i);
+  }
+  $output .= '</div>';
+  return $output;
+}
+
+function theme_simplevote_icon($type, $cid, $value, $filled) {
+  global $user;
+  $url =  'vote/' . $type . '/' . $cid . '/' . $value;
+  
+  if ($filled) {
+    $class = 'vote-on';
+  }
+  else {
+    $class = 'vote-off';
+  }
+  
+  // If the user isn't logged in, show the vote but don't let them change it.
+  // We do this by writing out a span with the same classes, rather than an <A> tag.
+  if ($user->uid == 0) {
+    return '<span class="'.$class.'"></span>';
+  }
+  else {
+    return l('', $url, array('class' => $class), drupal_get_destination(), NULL, FALSE, TRUE);
+  }
+}
+
+function theme_simplevote_css_path() {
+  return drupal_get_path('module', 'simplevote') . '/theme/simplevote.css';
+}
+
+function simplevote_nodeapi(&$node, $op, $teaser, $page) {
+  switch ($op) {
+    case 'view':
+      if ($teaser == false) {
+        $node->body = theme('simplevote_widget', $node->nid, 'node') . $node->body;
+      }
+      break;
+  }
+}
+
+function simplevote_votingapi_format($vobj, $field) {
+  if ($vobj->value_type == 'percent') {
+    switch ($field) {
+      case 'value':
+        $score = round($vobj->value / 20, 1);
+        return $score . ' stars';
+        break;
+      case 'result':
+        switch ($vobj->function) {
+          case 'average':
+            $score = round($vobj->value / 20, 1);
+            return $score . ' stars';
+            break;
+          case 'count':
+            return $vobj->value . ' votes';
+            break;
+        }
+        break;
+    }
+  }
+}
+
+function simplevote_votingapi_action_sets() {
+  $sets = array(
+    'simple_promotion' => array(
+      'description' => 'Promotes a node to the front page if enough users rate it highly.',
+      'content_type' => 'node',
+      'condition_mask' => 'AND',
+      'enabled' => 1,
+      'source' => 'SimpleVote',
+
+      'conditions' => array(
+        'is_promoted' => array(
+          'description' => 'Node is not promoted',
+          'handler' => 'votingapi_node_properties_handler',
+          'data' => array(
+            'property' => 'promote',
+            'comparison' => '!=',
+            'value' => 1,
+          ),
+        ),
+        'min_voters' => array(
+          'description' => 'More than 5 voters',
+          'handler' => 'votingapi_vote_result_handler',
+          'data' => array(
+            'function' => 'count',
+            'tag' => 'vote',
+            'comparison' => '>',
+            'value' => 5,
+          ),
+        ),
+        'min_vote' => array(
+          'description' => 'Average higher than 75',
+          'handler' => 'votingapi_vote_result_handler',
+          'data' => array(
+            'function' => 'average',
+            'tag' => 'vote',
+            'comparison' => '>',
+            'value' => 75,
+          ),
+        ),
+      ),
+      'actions' => array(
+        'action_node_promote',
+      ),
+    ),
+  );
+ 
+  return $sets;
+}
+
+function simplevote_elements() {
+  // A simple element that maps n points to a list of radio butons.
+  // Useful for 'five star' rating widgets and so on.
+  $type['rating'] = array(
+    '#input' => TRUE,
+    '#first' => 1,
+    '#points' => 5,
+    '#process' => array('expand_rating' => array())
+  );
+  return $type;
+}
+
+function theme_rating($element) {
+  if ($element['#title'] || $element['#description']) {
+    return theme('form_element', $element['#title'], '<div class="container-inline">' . $element['#children'] . '</div>', $element['#description'], $element['#id'], $element['#required'], form_get_error($element));
+  }
+  else {
+    return '<div class="container-inline">' . $element['#children'] . '</div>';
+  }
+}
+
+/**
+ * Roll out a single radios element to a list of radios,
+ * using the options array as index.
+ */
+function expand_rating($element) {
+  if ($element['#points'] > 1) {
+    for ($i = $element['#first']; $i <= $element['#points']; $i++) {
+      $element[$i] = array(
+        '#type' => 'radio',
+        '#return_value' => $i,
+        '#default_value' => $element['#default_value'],
+        '#parents' => $element['#parents'],
+        '#spawned' => TRUE,
+      );
+    }
+  }
+  return $element;
+}

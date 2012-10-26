@@ -1,0 +1,5 @@
+name = hook_jcarousel
+description = Hook module for jcarousel (add new skins) 
+package = User interface
+core = 7.x
+author = Feni}{

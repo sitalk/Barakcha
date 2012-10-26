@@ -1,0 +1,14 @@
+;$Id$
+
+name = Content Form
+description = This module adds new fields and jQuery features to the "Add New Content form.
+package = Webform
+core = 7.x
+
+files[] = contentform.module
+
+
+
+
+
+

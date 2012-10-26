@@ -1,0 +1,11 @@
+name = Multitag Vote
+description = Allowing multitag voting
+package = Voting
+dependencies[] = votingapi
+core = 7.x
+
+
+version = "7.x-1.x-dev"
+core = "7.x"
+datestamp = "1298619217"
+

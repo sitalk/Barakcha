@@ -1,0 +1,57 @@
+
+
+<?php
+
+/**
+* @file
+* Prevents the user from voting mupltiple times on a node
+*
+* Checks the tag for the current vote and deletes the rest from the database
+*/
+
+
+/**
+* Implementation of hook_votingapi_insert().
+*/
+
+/**
+* Implementation of hook_votingapi_storage_delete_votes().
+*/
+
+   if (limitvotes_votingapi_insert($vote) && $vote['tag']=='mudrets')
+   {
+      if $vote['tag']!=='mudrets'
+      {
+         function limitvotes_votingapi_storage_delete_votes($votes, $vids);
+      }
+
+   }
+
+   if (limitvotes_votingapi_insert($vote) && $vote['tag']=='ekspert')
+   {
+      if $vote['tag']!=='ekspert'
+      {
+         function limitvotes_votingapi_storage_delete_votes($votes, $vids);
+      }
+
+   }
+
+   if (limitvotes_votingapi_insert($vote) && $vote['tag']=='znatok')
+   {
+      if $vote['tag']!=='znatok'
+      {
+         function limitvotes_votingapi_storage_delete_votes($votes, $vids);
+      }
+
+   }
+
+   if (limitvotes_votingapi_insert($vote) && $vote['tag']=='novichok')
+   {
+      if $vote['tag']!=='novichok'
+      {
+         function limitvotes_votingapi_storage_delete_votes($votes, $vids);
+      }
+
+   }
+?>
+

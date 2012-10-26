@@ -1,0 +1,40 @@
+
+
+<?php
+
+/**
+* @file
+* Prevents the user from voting mupltiple times on a node
+*
+* Checks the tag for the current vote and deletes the rest from the database
+*/
+
+
+/**
+* Implementation of hook_votingapi_insert().
+*/
+
+ $expert_voted=0;  
+
+function limitvotes_votingapi_insert($vote)
+
+   {
+     $expert_voted=1;     /*the vote is not from this widget delete it*/  
+     echo "you voted";   
+     
+      	
+   }
+
+
+
+/*
+http://drupalcontrib.org/api/drupal/contributions!votingapi!votingapi.module/function/votingapi_select_results/7
+http://drupalcontrib.org/api/drupal/contributions!votingapi!votingapi.module/function/votingapi_select_single_vote_value/7
+http://drupalcontrib.org/api/drupal/contributions!votingapi!votingapi.module/function/calls/votingapi_select_votes/7
+http://drupalcontrib.org/api/drupal/contributions!votingapi!votingapi.module/function/votingapi_set_votes/7
+http://drupal.stackexchange.com/questions/25916/using-fivestar-get-votes-to-show-the-votes-on-a-node
+*/
+
+?>
+
+

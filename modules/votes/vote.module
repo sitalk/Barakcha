@@ -1,0 +1,945 @@
+<?php
+
+/**
+ * @file
+ * Defines a vote and vote result API that can be used by other modules.
+ */
+
+/*
+ * Implements hook_cron_queue_info().
+ *
+ * The cron queue caches the results for vote constellations that have been
+ * queued for recalculation.
+ */
+function vote_cron_queue_info() {
+  module_load_include('inc', 'vote', 'includes/vote.queue');
+  
+  return array(
+    'vote_queue' => array(
+      'worker callback' => 'vote_result_cache_results',
+      'time' => 60,
+    ),
+  );
+}
+
+/**
+ * Implements hook_exit().
+ */
+function vote_exit() {
+  module_load_include('inc', 'vote', 'includes/vote.queue');
+  
+  $queue = DrupalQueue::get('vote_static_queue');
+
+  while ($item = $queue->claimItem()) {
+    vote_result_cache_results($item->data);
+  }
+}
+
+/**
+ * Implements hook_entity_delete().
+ */
+function vote_entity_delete($entity, $type) {
+  // An entity has been deleted so lets delete all associated votes and
+  // results as well. We don't need to remove items from the queue
+  // as they won't do any harm anyways and will be removed on cron.
+  list($id) = entity_extract_ids($type, $entity);
+
+  db_delete('vote')
+    ->condition('entity_type', $type)
+    ->condition('entity_id', $id)
+    ->execute();
+
+  db_delete('vote_result')
+    ->condition('entity_type', $type)
+    ->condition('entity_id', $id)
+    ->execute();
+}
+
+/**
+ * Implements hook_user_cancel().
+ */
+function vote_user_cancel($edit, $account, $method) {
+  switch ($method) {
+    case 'user_cancel_delete':
+      // Delete all votes and queue their constellations.
+      module_load_include('inc', 'vote', 'includes/vote.admin');
+      
+      $votes = db_select('vote', 'v')
+        ->fields('v', array('entity_type', 'entity_id', 'bundle', 'aggregate'))
+        ->condition('uid', $account->uid)
+        ->execute()
+        ->fetchAll();
+
+      vote_mass_queue($votes);
+      break;
+
+    case 'user_cancel_reassign':
+      // Anonymize votes.
+      module_load_include('inc', 'vote', 'includes/vote.admin');
+
+      $votes = db_select('vote', 'v')
+        ->fields('v', array('vid'))
+        ->condition('uid', $account->uid)
+        ->execute()
+        ->fetchCol();
+
+      vote_mass_update($votes, array('uid' => 0));
+      break;
+  }
+}
+
+/**
+ * Stores and returns vote result function information. Vote result functions
+ * can be assigned to value types and are return multi-delta or single result
+ * values for a voting pool and target. Examples for vote result functions are
+ * "Average", "Sum" or "Count".
+ *
+ * @param $name (optional)
+ *   The name of an existing function.
+ *
+ * @return
+ *   An array containing all available vote result functions or one
+ *   single vote result function.
+ */
+function vote_function_info($name = NULL) {
+  $functions = &drupal_static(__FUNCTION__);
+
+  if (!isset($functions) && $cache = cache_get('vote_functions')) {
+    $functions = $cache->data;
+  }
+
+  if (!isset($functions)) {
+    $defaults = array(
+      'label' => '',
+      'description' => '',
+      'recalculation callback' => '',
+    );
+
+    // Collect vote result function information from modules.
+    foreach (module_implements('vote_function_info') as $module) {
+      if ($data = module_invoke($module, 'vote_function_info')) {
+        foreach ($data as $type => $info) {
+          $functions[$type] = $info + $defaults;
+          $functions[$type]['module'] = $module;
+          $functions[$type]['type'] = $type;
+        }
+      }
+    }
+
+    // Give modules a chance to alter the vote result functions array.
+    drupal_alter('vote_function_info', $functions);
+
+    // Cache the gathered information in the database.
+    cache_set('vote_functions', $functions);
+  }
+
+  if (isset($name) && isset($functions[$name])) {
+    // Return one single function if $name is set.
+    return $functions[$name];
+  }
+  elseif (!isset($name)) {
+    // Return an array containing all functions if $name is not set.
+    return $functions;
+  }
+}
+
+/**
+ * Stores and returns vote value type information. Each pool has exactly one
+ * value type and the available vote result functions and other vote and vote
+ * result behaviors are specific to the value type in some cases. Examples
+ * for value types are "Percent" or "Points". The value type describes how
+ * the vote and vote results need to be handled.
+ *
+ * @param $name (optional)
+ *   The name of an existing value type.
+ *
+ * @return
+ *   An array containing all available vote value types or one single
+ *   value type.
+ */
+function vote_type_info($name = NULL) {
+  $types = &drupal_static(__FUNCTION__);
+
+  if (!isset($types) && $cache = cache_get('vote_types')) {
+    $types = $cache->data;
+  }
+
+  if (!isset($types)) {
+    $defaults = array(
+      'label' => '',
+      'description' => '',
+      'functions' => array(),
+      'recalculation callback' => '',
+    );
+
+    // Collect vote value type information from modules.
+    foreach (module_implements('vote_type_info') as $module) {
+      if ($data = module_invoke($module, 'vote_type_info')) {
+        foreach ($data as $type => $info) {
+          $types[$type] = $info + $defaults;
+          $types[$type]['module'] = $module;
+          $types[$type]['type'] = $type;
+        }
+      }
+    }
+
+    // Give modules a chance to alter the value type array.
+    drupal_alter('vote_type_info', $types);
+
+    // Cache the gathered information in the database.
+    cache_set('vote_types', $types);
+  }
+
+  if (isset($name) && isset($types[$name])) {
+    // Return one single value type if $name is set.
+    return $types[$name];
+  }
+  elseif (!isset($name)) {
+    // Return an array containing all value types if $name is not set.
+    return $types;
+  }
+}
+
+/**
+ * Save changes to a vote or create a new vote.
+ *
+ * @param $vote
+ *   The $vote object to be saved. If $vote->vid is omitted a new vote will
+ *   be added.
+ */
+function vote_save($vote) {
+  // Add the proper timestamps to the $vote object.
+  $vote->created = empty($vote->vid) && empty($vote->created) ? REQUEST_TIME : $vote->created;
+  $vote->changed = REQUEST_TIME;
+
+  // Determine the proper $operation for this vote object (insert or update).
+  $operation = empty($vote->vid) ? 'insert' : 'update';
+
+  // Build the intersection of the passed $vote object and the actual field schema.
+  $fields = array_intersect_key((array) $vote, array_flip(drupal_schema_fields_sql('vote')));
+
+  if ($operation == 'update') {
+    // Update an existing vote.
+    // We don't need to update the primary key and the timestamp.
+    unset($fields['vid'], $fields['created']);
+
+    db_update('vote')
+      ->fields($fields)
+      ->condition('vid', $vote->vid)
+      ->execute();
+  }
+  else {
+    // Save a new vote to the database.
+    $vote->vid = db_insert('vote', array('return' => Database::RETURN_INSERT_ID))
+      ->fields($fields)
+      ->execute();
+  }
+
+
+  // Process the vote.
+  vote_queue($vote);
+
+  // Invoke module hooks.
+  module_invoke_all('vote_' . $operation, $vote);
+
+  return $vote->vid;
+}
+
+/**
+ * Deletes a single vote.
+ *
+ * @param $vid
+ *   A vote id.
+ */
+function vote_delete($vid) {
+  vote_delete_multiple(array($vid));
+}
+
+/**
+ * Deletes a set of votes.
+ *
+ * @param $vids
+ *   An array of vote ids.
+ */
+function vote_delete_multiple($vids) {
+  if ($votes = vote_load_multiple($vids)) {
+    foreach ($votes as $vote) {
+      module_invoke_all('vote_delete', $vote);
+      
+      vote_queue($vote);
+    }
+
+    // Delete after calling hooks so that they can query vote tables as needed.
+    db_delete('vote')
+      ->condition('vid', $vids)
+      ->execute();
+  }
+}
+
+/**
+ * Loads a vote as stdClass Object.
+ *
+ * @param $vid
+ *   The vid of the vote you want to load.
+ *
+ * @return
+ *   A vote as stdClass Object or FALSE if the vid doesn't exist.
+ */
+function vote_load($vid) {
+  $votes = vote_load_multiple(array($vid));
+
+  return !empty($votes) ? reset($votes) : FALSE;
+}
+
+/**
+ * Loads multiple votes.
+ *
+ * @param $vids
+ *   An array of vids. Leave empty if you want to fetch by condition.
+ * @param $conditions
+ *   An array of conditions. Leave empty if you want to fetch by vid.
+ *
+ * @return
+ *   An array of votes as stdClass Objects.
+ */
+function vote_load_multiple($vids = array(), $conditions = array()) {
+  if (!empty($vids)) {
+    return db_select('vote', 'v')
+      ->fields('v')
+      ->condition('vid', $vid)
+      ->execute()
+      ->fetchAll();
+  }
+  else if (!empty($conditions)) {
+    $conditions = array_intersect_key((array) $vote, array_flip(drupal_schema_fields_sql('vote')));
+    $query = db_select('vote', 'v')->fields('v');
+
+    foreach ($conditions as $key => $value) {
+      $query->condition($key, $value);
+    }
+      
+    return $query->execute()->fetchAll();
+  }
+
+  return FALSE;
+}
+
+/**
+ * Caches the results of a voting.
+ *
+ * @param $item
+ *   A pool-target constellation containing th  e machine-readable pool name
+ *   as well as the entity id and the entity type of the target.
+ */
+function vote_result_cache_results($item) {
+  // Populate the $item->functions with the proper functions array.
+  $bundle = $item->aggregate ? vote_aggregate_get_aggregate($item->bundle) : vote_pool_get_pool($item->bundle);
+
+  if ($bundle && !empty($bundle->functions) && (!$item->aggregate || !empty($bundle->pools))) {
+    // Delete all old results for this constellation so we don't end up with
+    // ghost results.
+    $query = db_delete('vote_result')
+      ->condition('entity_type', $item->entity_type)
+      ->condition('entity_id', $item->entity_id)
+      ->condition('bundle', $item->bundle)
+      ->condition('aggregate', $item->aggregate)
+      ->condition('function', $bundle->functions);
+
+    $query->execute();
+
+    $pools = $item->aggregate ? $bundle->pools : $item->bundle;
+
+    if ($results = vote_result_recalculate_results($item, $bundle->functions, $pools)) {
+      // Looks like we have an array of results so let's save them.
+      $query = db_insert('vote_result')->fields(drupal_schema_fields_sql('vote_result'));
+
+      // The $result array is already pre-formatted in the right order. So we
+      // can just add it safely.
+      foreach ($results as $result) {
+        $query->values(array_values($result));
+      }
+
+      $query->execute();
+    }
+  }
+}
+
+/**
+ * @param $item
+ *   A pool-target constellation containing the machine-readable pool name
+ *   as well as the entity id and the entity type of the target.
+ *
+ * @return
+ *   An array of results or FALSE if there are no votes.
+ */
+function vote_result_recalculate_results($item, $functions, $pools) {
+  $results = array();
+  
+  if (!empty($functions)) {    
+    // Iterate over all functions and invoke the recalculation callbacks.
+    foreach ($functions as $function) {
+      if ($info = vote_function_info($function)) {
+        $callback = $info['recalculation callback'];
+
+        if (function_exists($callback) && $result = $callback($item, $function, $pools)) {
+          // If this function returns an array we use the keys of that array as
+          // result value deltas.
+          if (is_array($result)) {
+            foreach ($result as $delta => $value) {
+              $current = array(
+                'result' => $value,
+                'delta' => $delta,
+                'function' => $function,
+                'bundle' => $item->bundle,
+                'aggregate' => $item->aggregate,
+                'entity_type' => $item->entity_type,
+                'entity_id' => $item->entity_id,
+                'timestamp' => REQUEST_TIME,
+              );
+
+              $key = vote_result_key((object) $current);
+
+              array_push($results, array('rid' => $key) + $current);
+            }
+          }
+          // Otherwise we handle this as a single result value.
+          else {
+            $current = array(
+              'result' => $result,
+              'delta' => '',
+              'function' => $function,
+              'bundle' => $item->bundle,
+              'aggregate' => $item->aggregate,
+              'entity_type' => $item->entity_type,
+              'entity_id' => $item->entity_id,
+              'timestamp' => REQUEST_TIME,
+            );
+
+            $key = vote_result_key((object) $current);
+
+            array_push($results, array('rid' => $key) + $current);
+          }
+        }
+      }
+    }
+  }
+
+  return $results;
+}
+
+/**
+ * Queues a constellation for recalculation. We have two different queues. One
+ * has a Database Backend and is reserved for Cron and one saves the queued
+ * items in a static variable that we loop over in hook_exit().
+ *
+ * @param $item
+ *   A full object.
+ */
+function vote_queue($item) {
+  if ($info = vote_pool_get_pool($item->pool)) {
+    module_load_include('inc', 'vote', 'includes/vote.queue');
+
+    $queue = array(
+      'bundle' => $item->pool,
+      'aggregate' => (int) FALSE,
+      'entity_type' => $item->entity_type,
+      'entity_id' => $item->entity_id,
+    );
+
+    DrupalQueue::get($info->queue)->createItem((object) $queue);
+
+    // Now we queue the aggregates (if there are any).
+    if (!empty($info->aggregates)) {
+      foreach ($info->aggregates as $name) {
+        if ($aggregate = vote_aggregate_get_aggregate($name)) {
+          $queue = array(
+            'bundle' => $name,
+            'aggregate' => (int) TRUE,
+            'entity_type' => $item->entity_type,
+            'entity_id' => $item->entity_id,
+          );
+
+          DrupalQueue::get($aggregate->queue)->createItem((object) $queue);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * @todo
+ */
+function _vote_bundles_build($rebuild = FALSE) {
+  $cache = &drupal_static(__FUNCTION__);
+
+  if (!isset($cache) || $rebuild) {
+    if (!$rebuild && $cache = cache_get('vote_bundles')) {
+      return $cache = $cache->data;
+    }
+
+    $pools = _vote_pool_info_build($rebuild);
+    $aggregates = _vote_aggregate_info_build($rebuild);
+
+    foreach ($pools as $name => $pool) {
+      $info = vote_type_info($pool->type);
+      $pools[$name]->aggregates = array();
+      $pools[$name]->functions = array();
+      $pools[$name]->queue = !empty($pool->settings['queue']) ? 'vote_queue' : 'vote_static_queue';
+
+      foreach ($pool->settings['functions'] as $function) {
+        // Create a list of all enabled and available functions.
+        if (in_array($function, $info['functions']) && vote_function_info($function)) {
+          $pools[$name]->functions[] = $function;
+        }
+      }
+    }
+
+    foreach ($aggregates as $name => $aggregate) {
+      $info = vote_type_info($aggregate->type);
+      $aggregates[$name]->pools = array();
+      $aggregates[$name]->functions = array();
+      $aggregates[$name]->queue = !empty($aggregate->settings['queue']) ? 'vote_queue' : 'vote_static_queue';
+
+      foreach ($aggregate->settings['functions'] as $function) {
+        // Create a list of all enabled and available functions.
+        if (in_array($function, $info['functions']) && vote_function_info($function)) {
+          $aggregates[$name]->functions[] = $function;
+        }
+      }
+
+      foreach ($aggregate->settings['pools'] as $pool) {
+        if (!empty($pools[$pool]) && $pools[$pool]->type == $aggregate->type) {
+          $aggregates[$name]->pools[] = $pool;
+          $pools[$pool]->aggregates[] = $name;
+        }
+      }
+    }
+
+    $cache = (object) array(
+      'pools' => $pools,
+      'aggregates' => $aggregates,
+    );
+
+    // Cache the bundles
+    cache_set('vote_bundles', $cache);
+  }
+
+  return $cache;
+}
+
+/**
+ * @todo
+ */
+function _vote_pool_info_build($rebuild = FALSE) {
+  $pools = array();
+
+  // Collect module defined vote pools.
+  foreach (module_implements('vote_pool_info') as $module) {
+    if ($data = module_invoke($module, 'vote_pool_info')) {
+      foreach ($data as $pool => $info) {
+        if ($type = vote_type_info($info['type'])) {
+          $pools[$pool] = vote_pool_set_defaults($info);
+          $pools[$pool]->module = $module;
+          $pools[$pool]->pool = $pool;
+
+          // We mark all module defined pools as "new" since we don't know
+          // which of these pools have already been saved to the database at
+          // this point.
+          $pools[$pool]->new = TRUE;
+        }
+      }
+    }
+  }
+
+  $query = db_select('vote_pool', 'vp')->fields('vp');
+
+  foreach ($query->execute() as $pool) {
+    $key = $pool->pool;
+    $disabled = $pool->disabled;
+
+    // If the pool is not a custom pool and is not defined by a module either
+    // we mark it as disabled. Otherwise we mark it as enabled.
+    $pool->disabled = !$pool->custom && empty($pools[$key]);
+
+    if (!empty($pools[$key])) {
+      // This is a module defined pool that already exists in the database
+      // so its definitely not new.
+      $pools[$key]->new = FALSE;
+    }
+
+    if (empty($pools[$key]) || $pool->modified) {
+      // If this pools has not been defined by a module or has been modified
+      // by an administrator we place it in our actual $pools array and overwrite
+      // its original representation (if any).
+      $pools[$key] = $pool;
+    }
+
+    $pools[$key]->disabled = $pool->disabled;
+    $pools[$key]->changed = $disabled != $pool->disabled;
+  }
+
+  if ($rebuild) {
+    foreach ($pools as $pool) {
+      if (!empty($pool->new) || !empty($pool->changed)) {
+        vote_pool_save($pool);
+      }
+    }
+  }
+
+  return $pools;
+}
+
+/**
+ * @todo
+ */
+function _vote_aggregate_info_build($rebuild = FALSE) {
+  $aggregates = array();
+
+  // Collect module defined vote aggregates.
+  foreach (module_implements('vote_aggregate_info') as $module) {
+    if ($data = module_invoke($module, 'vote_aggregate_info')) {
+      foreach ($data as $aggregate => $info) {
+        if ($type = vote_type_info($info['type'])) {
+          $aggregates[$aggregate] = vote_aggregate_set_defaults($info);
+          $aggregates[$aggregate]->module = $module;
+          $aggregates[$aggregate]->aggregate = $aggregate;
+        }
+      }
+    }
+  }
+
+  $query = db_select('vote_aggregate', 'va')->fields('va');
+
+  foreach ($query->execute() as $aggregate) {
+    $key = $aggregate->aggregate;
+    $disabled = $aggregate->disabled;
+
+    // If the aggregate is not a custom aggregate and is not defined by a module either
+    // we mark it as disabled. Otherwise we mark it as enabled.
+    $aggregate->disabled = !$aggregate->custom && empty($aggregates[$key]);
+
+    if (!empty($aggregates[$key])) {
+      // This is a module defined aggregate that already exists in the database
+      // so its definitely not new.
+      $aggregates[$key]->new = FALSE;
+    }
+
+    if (empty($aggregates[$key]) || $aggregate->modified) {
+      // If this aggregates has not been defined by a module or has been modified
+      // by an administrator we place it in our actual $aggregates array and overwrite
+      // its original representation (if any).
+      $aggregates[$key] = $aggregate;
+    }
+
+    $aggregates[$key]->disabled = $aggregate->disabled;
+    $aggregates[$key]->changed = $disabled != $aggregate->disabled;
+  }
+
+  if ($rebuild) {
+    foreach ($aggregates as $aggregate) {
+      if (!empty($aggregate->new) || !empty($aggregate->changed)) {
+        vote_aggregate_save($aggregate);
+      }
+    }
+  }
+
+  return $aggregates;
+}
+
+/**
+ * @todo
+ */
+function vote_pool_get_pools() {
+  return _vote_bundles_build()->pools;
+}
+
+/**
+ * @todo
+ */
+function vote_pool_get_pool($pool) {
+  $pools = _vote_bundles_build()->pools;
+
+  return isset($pools[$pool]) ? $pools[$pool] : FALSE;
+}
+
+/**
+ * @todo
+ */
+function vote_aggregate_get_aggregates() {
+  return _vote_bundles_build()->aggregates;
+}
+
+/**
+ * @todo
+ */
+function vote_aggregate_get_aggregate($aggregate) {
+  $aggregates = _vote_bundles_build()->aggregates;
+
+  return isset($aggregates[$aggregate]) ? $aggregates[$aggregate] : FALSE;
+}
+
+/**
+ * Sets the default values for a voting pool.
+ *
+ * @param $pool
+ *   An object or array containing values to override the defaults.
+ *   See hook_vote_pool_info() for details on what the array elements mean.
+ *
+ * @return
+ *   A voting pool object, with missing values in $pool set to their defaults.
+ */
+function vote_pool_set_defaults($pool) {
+  $pool = ((array) $pool + array(
+    'pool' => '',
+    'name' => '',
+    'module' => '',
+    'description' => '',
+    'settings' => array(),
+    'custom' => 0,
+    'modified' => 0,
+    'locked' => 0,
+    'disabled' => 0,
+  ));
+
+  $type = vote_type_info($pool['type']);
+
+  // Also populate the settings array with some defaults.
+  $pool['settings'] += array(
+    'functions' => $type['functions'],
+    'queue' => TRUE,
+  );
+
+  return (object) $pool;
+}
+
+/**
+ * Sets the default values for a voting pool.
+ *
+ * @param $aggregate
+ *   An object or array containing values to override the defaults.
+ *   See hook_vote_aggregate_info() for details on what the array elements mean.
+ *
+ * @return
+ *   A aggregate object, with missing values in $aggregate set to their defaults.
+ */
+function vote_aggregate_set_defaults($aggregate) {
+  // Typecast $aggregate to be an array so we can easily populate that array
+  // with some default values in the next step.
+  $aggregate = (array) $aggregate + array(
+    'aggregate' => '',
+    'name' => '',
+    'module' => '',
+    'description' => '',
+    'settings' => array(),
+    'custom' => 0,
+    'modified' => 0,
+    'locked' => 0,
+    'disabled' => 0,
+  );
+
+  $type = vote_type_info($aggregate['type']);
+
+  // Also populate the settings array with some defaults.
+  $aggregate['settings'] += array(
+    'pools' => array(),
+    'functions' => $type['functions'],
+    'queue' => TRUE,
+  );
+
+  return (object) $aggregate;
+}
+
+/**
+ * Saves a node type to the database.
+ *
+ * @param $pool
+ *   The voting pool to save, as an object.
+ */
+function vote_pool_save($pool) {
+  // First, figure out wether we need to update an existing pool or insert a new
+  // one. So... Does the $pool->type already exist?
+  $exists = (bool) db_select('vote_pool', 'vp')
+    ->condition('pool', $pool->pool)
+    ->countQuery()
+    ->execute()
+    ->fetchField();
+
+  $operation = $exists ? 'update' : 'insert';
+
+  // Populate the $pool with some default values if those are not set.
+  $pool = vote_pool_set_defaults($pool);
+
+  $fields = array(
+    'pool' => (string) $pool->pool,
+    'name' => (string) $pool->name,
+    'description' => (string) $pool->description,
+    'custom' => (int) $pool->custom,
+    'modified' => (int) $pool->modified,
+    'locked' => (int) $pool->locked,
+    'disabled' => (int) $pool->disabled,
+    'module' => (string) $pool->module,
+    'settings' => serialize($pool->settings),
+  );
+
+  if ($operation == 'update') {
+    db_update('vote_pool')
+      ->fields($fields)
+      ->condition('pool', $pool->pool)
+      ->execute();
+  }
+  else {
+    db_insert('vote_pool')
+      ->fields($fields)
+      ->execute();
+  }
+
+  // Inform other modules about the update / insert.
+  module_invoke_all('vote_pool_' . $operation, $pool);
+
+  // Clear the cache.
+  vote_bundle_cache_reset();
+
+  return $operation == 'update' ? SAVED_UPDATED : SAVED_NEW;
+}
+
+/**
+ * Deletes a voting pool from the database.
+ *
+ * @param $name
+ *   The machine-readable name of the voting pool to be deleted.
+ */
+function vote_pool_delete($name) {
+  // Delete the pool itself.
+  db_delete('vote_pool')
+    ->condition('pool', $name)
+    ->execute();
+
+  // Delete all votes and vote results in the pool.
+  db_delete('vote')
+    ->condition('pool', $name)
+    ->execute();
+
+  db_delete('vote_result')
+    ->condition('pool', $name)
+    ->execute();
+
+  // Normally we would not have to flush the queue but since this function
+  // is being used so rarely we can afford doing it here.
+  db_delete('vote_queue')
+    ->condition('pool', $name)
+    ->execute();
+
+  module_invoke_all('vote_pool_delete', $name);
+
+  // Clear the pool and the aggregate cache.
+  vote_bundle_cache_reset();
+}
+
+/**
+ * Saves am aggregate to the database.
+ *
+ * @param $info
+ *   The voting aggregate to save, as an object.
+ */
+function vote_aggregate_save($aggregate) {
+  // First, figure out wether we need to update an existing pool or insert a new
+  // one. So... Does the $pool->type already exist?
+  $exists = (bool) db_select('vote_aggregate', 'va')
+    ->condition('pool', $aggregate->aggregate)
+    ->countQuery()
+    ->execute()
+    ->fetchField();
+
+  $operation = $exists ? 'update' : 'insert';
+
+  // Populate the $pool with some default values if those are not set.
+  $aggregate = vote_aggregate_set_defaults($aggregate);
+
+  $fields = array(
+    'pool' => (string) $aggregate->aggregate,
+    'name' => (string) $aggregate->name,
+    'description' => (string) $aggregate->description,
+    'custom' => (int) $aggregate->custom,
+    'modified' => (int) $aggregate->modified,
+    'locked' => (int) $aggregate->locked,
+    'disabled' => (int) $aggregate->disabled,
+    'module' => (string) $aggregate->module,
+    'settings' => serialize($aggregate->settings),
+  );
+
+  if ($operation == 'update') {
+    db_update('vote_aggregate')
+      ->fields($fields)
+      ->condition('pool', $pool->pool)
+      ->execute();
+  }
+  else {
+    db_insert('vote_aggregate')
+      ->fields($fields)
+      ->execute();
+  }
+
+  // Inform other modules about the update / insert.
+  module_invoke_all('vote_aggregate_' . $operation, $aggregate);
+
+  // Clear the cache.
+  vote_bundle_cache_reset();
+
+  return $operation == 'update' ? SAVED_UPDATED : SAVED_NEW;
+}
+
+/**
+ * Deletes an aggregate from the database.
+ *
+ * @param $name
+ *   The machine-readable name of the aggregate to be deleted.
+ */
+function vote_aggregate_delete($name) {
+  // Delete the aggregate itself.
+  db_delete('vote_aggregate')
+    ->condition('aggregate', $name)
+    ->execute();
+
+  db_delete('vote_result')
+    ->condition('bundle', $name)
+    ->condition('aggregate', TRUE)
+    ->execute();
+
+  // Normally we would not have to flush the queue but since this function
+  // is being used so rarely we can afford doing it here.
+  db_delete('vote_queue')
+    ->condition('bundle', $name)
+    ->condition('aggregate', TRUE)
+    ->execute();
+
+  module_invoke_all('vote_aggregate_delete', $name);
+
+  // Clear the aggregate and the pool cache.
+  vote_bundle_cache_reset();
+}
+
+/**
+ * Clears the voting bundles cache.
+ */
+function vote_bundle_cache_reset() {
+  drupal_static_reset('_vote_bundle_build');
+  cache_clear_all('vote_bundles', 'cache');
+}
+
+/**
+ * @todo
+ */
+function vote_queue_key($item) {
+  $item = array($item->entity_type, $item->entity_id, $item->bundle, $item->aggregate);
+
+  return hash('sha256', serialize($item));
+}
+
+/**
+ * @todo
+ */
+function vote_result_key($item) {
+  $item = array($item->entity_type, $item->entity_id, $item->bundle, $item->aggregate, $item->function, $item->delta);
+
+  return hash('sha256', serialize($item));
+}

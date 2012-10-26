@@ -1,0 +1,22 @@
+<?php
+/**
+* Implements hook_form_alter().
+*/
+function contentform_form_alter(&$form, $form_state, $form_id) {
+  if($form_id == 'blog_node_form')
+  {
+   /*$form['field_blog_category']['#access']=FALSE; */
+   /*$form['title']['#title'] = t('New Form Title');*/
+   /*
+   $form['field_blog_category'] = array(
+  '#type' => 'fieldset',
+  '#title' => t('Choices'),
+  '#prefix' => '<div class="blog_category_field">',
+  '#suffix' => '</div>',
+  '#tree' => TRUE,
+);*/
+   echo "This is the form";
+}
+}
+?>
+

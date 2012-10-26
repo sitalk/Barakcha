@@ -1,0 +1,66 @@
+/*Style for barakcha skin*/
+
+.jcarousel-skin-barakcha {
+  margin: 0 auto;
+  width: 650px;
+}
+
+.jcarousel-skin-barakcha .jcarousel-container {
+  margin: auto;
+}
+
+.jcarousel-skin-barakcha .jcarousel-container-horizontal {
+  width: 650px;
+}
+
+.jcarousel-skin-barakcha .jcarousel-clip-horizontal {
+  width: 650px;
+  overflow: hidden;
+}
+
+.jcarousel-skin-barakcha .jcarousel-clip-vertical {
+  height: 650px;
+  overflow: hidden;
+}
+
+.jcarousel-skin-barakcha .jcarousel-item {
+  margin: 0!important;
+  padding: 0;
+  width: 260px!important;
+  height: 250px;
+  overflow: hidden;
+  list-style: none;
+}
+
+.jcarousel-skin-barakcha .jcarousel-item-placeholder {
+  background: #fff url(throbber.gif) no-repeat center center;
+  color: #000;
+}
+
+/**
+ * Buttons
+ */
+.jcarousel-skin-barakcha .jcarousel-next 
+{
+  width: 19px;
+  height: 20px;
+  background-image: url(next.png);
+}
+.jcarousel-skin-barakcha .jcarousel-prev {
+  display: block;
+  width: 19px;
+  height: 21px;
+  background-image: url(prev.png);
+}
+
+.jcarousel-skin-barakcha .jcarousel-prev-horizontal {
+  position: absolute;
+  top: 110px;
+  left: -25px;
+}
+
+.jcarousel-skin-barakcha .jcarousel-next-horizontal {
+  position: absolute;
+  top: 110px;
+  right: -25px;
+}

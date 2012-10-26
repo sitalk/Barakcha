@@ -1,0 +1,113 @@
+/*
+Theme name: "Barakcha";
+Version: 1.0.1;
+Site: http://barakcha.kg;
+Author: Feni}{;
+Author e-mail: fedorov.viktor.1988@gmail.com;
+*/
+
+body { background: url(../images/body_bg.png); font-family: Arial;}
+img { border: none;}
+
+.left { float: left;}
+.right { float: right;}
+
+/*Header menu class*/
+#header_menu { width: 100%; height: 50px; background: #545454;}
+	#header_menu ul { list-style-type: none; margin: 0; padding: 0;}
+		#header_menu ul .img_border { width: 4px; height: 50px;}
+		#header_menu ul li { display: inline; float: left; width: 140px; height: 50px; }
+
+			#header_menu ul li .img_pies { float: left; width: 35px; height: 35px; margin: 7px 0 0 20px; background: url(../images/icons/pies_icon.png) no-repeat;}
+				#header_menu ul li.active .img_pies { background: url(../images/icons/active_pies_icon.png);}
+
+			#header_menu ul li .img_files { float: left; width: 35px; height: 35px; margin: 7px 0 0 20px; background: url(../images/icons/files_icon.png) no-repeat;}
+				#header_menu ul li.active .img_files { background: url(../images/icons/active_files_icon.png);}
+
+			#header_menu ul li .img_blogs { float: left; width: 35px; height: 35px; margin: 7px 0 0 20px; background: url(../images/icons/blogs_icon.png) no-repeat;}
+				#header_menu ul li.active .img_blogs { background: url(../images/icons/active_blogs_icon.png);}
+
+			#header_menu ul li .img_diskus { float: left; width: 35px; height: 35px; margin: 7px 0 0 20px; background: url(../images/icons/diskus_icon.png) no-repeat;}
+				#header_menu ul li.active .img_diskus { background: url(../images/icons/active_diskus_icon.png);}
+
+			#header_menu ul li .img_user { float: left; width: 35px; height: 35px; margin: 7px 0 0 20px; background: url(../images/icons/user_icon.png) no-repeat;}
+
+			#header_menu ul li ._link { float: left; width: 50px; height: 20px; margin: 12px 0 0 10px; font-size: 18px; color: #fff;}
+			#header_menu ul li .user_name { float: right; width: auto; height: 20px; margin: 12px 10px 0 10px; font-size: 18px; color: #fff;}
+
+#wrapper { width: 1200px; height: 900px; margin: 0 auto;}
+
+/*Main header*/
+#header { width: 1200px; height: 90px;}
+	.logo { margin: 15px 0 0 0;}
+	.search { width: 775px; height: 30px; margin-top: 35px;}
+		.search input[type="text"] { float: right; width: 615px; font-size: 14px; color: #dcdcdc; margin: 0; padding: 5px 10px 5px 35px; border-radius: 5px 0 0 5px; border: solid 1px #dcdcdc; border-right: none;}
+		.search input[type="button"] { float: right; width: 111px; height: 29px; margin: 0 ; border: none; background: url(../images/search_bt.png) no-repeat; font-size: 14px; color: #fff;}
+		.search .search_ico { width: 18px; height: 15px; background: url(../images/search_ico.png) no-repeat; position: relative; left: 15px; top: 6px;}
+
+#content { width: 1200px; height: 800px; background: url(../images/content_bg.png) no-repeat; box-shadow: 0 0 40px #dcdcdc; -webkit-box-shadow: 0 0 40px #dcdcdc; -moz-box-shadow: 0 0 40px #dcdcdc;} /*поменять height на auto*/
+
+/*Main menu*/
+	#main_menu { width: 1200px; height: 90px; }
+		#main_menu .left_menu_item { width: 20px; height: 90px; background: url(../images/left_menu_item.png) no-repeat;}
+		#main_menu .right_menu_item { width: 460px; height: 90px; background: url(../images/right_menu_item.png) no-repeat;}
+		#main_menu ul { list-style-type: none; margin: 0; padding: 0; }
+			#main_menu ul li { display: inline; float: left; width: 120px; height: 90px; background: url(../images/menu_bg.png) no-repeat;}
+			#main_menu ul li.active { background: url(../images/menu_bg_active.png) no-repeat;}
+			#main_menu ul li a { display: block; float: left;}
+
+				#main_menu ul li a .img_home {width: 47px; height: 46px; margin: 8px 0 5px 40px; background: url(../images/icons/home_icon.png) no-repeat;}
+					#main_menu ul li.active a .img_home { background: url(../images/icons/active_home_icon.png) no-repeat;}
+
+				#main_menu ul li a .img_profile {width: 47px; height: 46px; margin: 8px 0 5px 40px; background: url(../images/icons/profile_icon.png) no-repeat;}
+					#main_menu ul li.active a .img_profile {  margin: 7px 0 5px 40px; background: url(../images/icons/active_profile_icon.png) no-repeat;}
+
+				#main_menu ul li a .img_write {width: 47px; height: 46px; margin: 8px 0 5px 40px; background: url(../images/icons/write_icon.png) no-repeat;}
+					#main_menu ul li.active a .img_write { background: url(../images/icons/active_write_icon.png) no-repeat;}
+
+				#main_menu ul li a .img_rand {width: 47px; height: 46px; margin: 8px 0 5px 40px; background: url(../images/icons/rand_icon.png) no-repeat;}
+					#main_menu ul li.active a .img_rand { background: url(../images/icons/active_rand_icon.png) no-repeat;}
+
+				#main_menu ul li a .img_stat {width: 47px; height: 46px; margin: 8px 0 5px 40px; background: url(../images/icons/stat_icon.png) no-repeat;}
+					#main_menu ul li.active a .img_stat { background: url(../images/icons/active_stat_icon.png) no-repeat;}
+
+				#main_menu ul li a .img_set {width: 47px; height: 46px; margin: 8px 0 5px 40px; background: url(../images/icons/settings_icon.png) no-repeat;}
+					#main_menu ul li.active a .img_set { background: url(../images/icons/active_home_icon.png) no-repeat;}
+			
+				#main_menu ul li a ._link { float: left; margin-left: 3px; width: 120px; font-size: 12px; color: #a7a8a9; text-align: center;}
+					#main_menu ul li.active a ._link { color: #545454;}
+	
+	#content_inner { width: 1200px; height: 710px; } /*поменять height на auto*/
+
+	/*User info*/
+		#content_inner .user_info { width: 168px; height: 229px; margin: 20px;}
+			.user_info .bg{ width: 168px; height: 170px; background: url(../images/user_info_bg.png); position: relative; z-index: 10;}
+				.user_info .user_photo { width: 150px; height: 152px; margin: 8px; border: solid 1px #a7a8a9;}
+				.user_info .details { width: 150px; height: 68px; margin: -10px 0 0 9px; background: url(../images/user_info_details.png) no-repeat;}
+					.user_info .details a { text-decoration: none; color: #a7a8a9;}
+					.user_info .details a.name { margin: 10px 0 0 10px; font-size: 14px; font-weight: bold;}			
+					.user_info .details a.status { margin: 5px 10px; padding: 0; font-size: 11px;}
+	
+	/*Users Top slide show*/
+		#content_inner .users_top { margin: 20px 0 0 20px; width: 970px; height: 150px;}
+			.users_top ._header { width: 970px; height: 20px; text-align: center; font-size: 16px; color: #a7a8a9; font-weight: bold;}
+			.users_top ._body { width: 970px; height: 120px;}
+			.users_top .users_carousel { margin: 0 auto; padding: 0; width: 900px; height: 80px;}
+		#prev { display: block; position: relative; top: -75px; left: -5px; width: 25px; height: 72px; background: url(../images/ssu/prev.png) no-repeat;}
+		#next { display: block; position: relative; top: -150px; left: 935px; width: 25px; height: 72px; background: url(../images/ssu/next.png) no-repeat;}
+				.users_carousel ul { padding: 0; list-style-type: none;}
+					.users_carousel ul li { float: left; display: block; width: 80px; height: 100px; text-align: center; margin-right:25px; font-size: 10px; color: #545454;}
+					.users_carousel ul li img { width: 80px; height: 80px; border: solid #dedede 1px; }
+	/*Ribbon header*/
+		#content_inner .ribbon{ width: 700px; height: auto; margin-left: 20px;}
+			.ribbon ._header { width: 700px; height: 50px; margin: 0; padding: 0;}
+			._header ul { list-style-type: none; padding-left: 5px; }
+				._header ul li { display: inline; margin-left: -0.25em; padding: 5px 12px 7px 12px; border: solid 1px #dedede; border-left: none; background-color: #f1f1f1;}
+					._header ul li.active { background-image: url(../images/lenta/active_bg.png); background-color: #f1f1f1;}
+				._header ul li:first-child { width: 60px; height: 33px; background: url(../images/lenta/first_li.png) no-repeat; border-right: none; padding-right: 0.83em; color: #004973;}
+					._header ul li a { color: #545454; font-size: 12px; text-decoration: none;}
+			.ribbon ._body { width: 700px; height: 300px; margin-top: 20px;}
+				._body .item { width: 700px; height: 70px; font-size: 16px; color: #545454; margin-bottom: 10px;}
+					.item ._header { width: 620px; height: 20px; margin-left: 10px; padding-bottom: 3px; border-bottom: solid 1px #cdcdcd;}
+						._header a {  font-weight: bold; text-decoration: none; color: #545454;}
+					.item ._text { width: 620px; height: 30px; margin-left: 10px; padding-top: 3px;}

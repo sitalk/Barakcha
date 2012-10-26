@@ -1,0 +1,58 @@
+
+Extra Voting forms - installation
+---------------------------
+
+Unpack the module in your "modules" directory.
+
+INSTALLATION:
+
+1. Place the module in the "modules" directory of your drupal installation
+
+2. This module requires jQuery 1.2.1, which is not what comes with Drupal 5.x. 
+   Unfortunately, the JQuery Update module won't be very helpful since it
+   doesn't come with JQuery 1.2.1. You will need to use the JQuery module
+   that comes with this module: jquery-1.2.1.pack.js and copy it over
+   [your_drupal_directory]/misc/jquery.js
+
+   This might possibly break other modules - sorry! This is a temporary
+   problem: Drupal 6.x, coming out soon, will use JQuery 1.2.1 
+
+3. Enable this module by navigating to:
+        Administer > Site building > Modules
+
+4. Go to Administer > User Management > Access control, and set one or more
+   users as voting administrators. 
+
+5. Step 5 was deleted because it was no longer necessary. Ah! :-D
+
+6. OPTIONAL. If you want to place the karma form or info anywhere else in the
+   comment, open your comment.tpl.php file and add:
+
+   <? if(module_exists('extra_voting_forms')){ print extra_voting_forms_show_form($comment, 'c', 1, 'big');} ?> (to show the form anywhere in the comment, type #1, "big" version. You can also choose "small")
+
+   If you want to place the karma form or info anywhere else in the
+   node, open your node.tpl.php:
+
+   <? if(module_exists('extra_voting_forms')){ print extra_voting_forms_show_form($node, 'n', 3, 'big');} ?> (to show the form anywhere in the node)
+
+   The third parameter can be:
+
+     1 -- Select, with all of the possile values available
+     2 -- Select, with only the negative values allowed
+     3 -- Vote up/down
+     4 -- Vote UP ONLY
+
+   Please note that the voting skin "fsdailys" in ICOMPLETE, that is only some
+   combinations are allowed (the ones you see in http://www.fsdaily.com). For
+   customisation, if you want a complete set please base your template
+   on "default".
+
+7. Configure your module by going to 
+
+    Administer > Site configuration > Extra Voting forms
+
+   The options should be self-explanatory.
+
+8. Enjoy!
+
+Tony Mobily

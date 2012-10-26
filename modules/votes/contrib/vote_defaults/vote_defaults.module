@@ -1,0 +1,121 @@
+<?php
+
+/**
+ * Implements hook_vote_type_info().
+ */
+function vote_defaults_vote_type_info() {
+  return array(
+    'percent' => array(
+      'label' => t('Percent'),
+      'description' => t('Percent'),
+      'functions' => array('average', 'count'),
+    ),
+    'points' => array(
+      'label' => t('Points'),
+      'description' => t('Points'),
+      'functions' => array('average', 'sum', 'count'),
+    ),
+    'choice' => array(
+      'label' => t('Choice'),
+      'description' => t('Choice'),
+      'functions' => array('score', 'count'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_vote_function_info.
+ */
+function vote_defaults_vote_function_info() {
+  return array(
+    'average' => array(
+      'label' => t('Average'),
+      'description' => t('Description'),
+      'recalculation callback' => 'vote_defaults_function_average',
+    ),
+    'sum' => array(
+      'label' => t('Sum'),
+      'description' => t('Sum'),
+      'recalculation callback' => 'vote_defaults_function_sum',
+    ),
+    'count' => array(
+      'label' => t('Count'),
+      'description' => t('Count'),
+      'recalculation callback' => 'vote_defaults_function_count',
+    ),
+    'score' => array(
+      'label' => t('Score'),
+      'description' => t('Description'),
+      'recalculation callback' => 'vote_defaults_function_score',
+    ),
+  );
+}
+
+/**
+ * Calculates the vote count.
+ *
+ * @return
+ *   An integer representing the number of votes for this constellation.
+ */
+function vote_defaults_function_count($item, $function, $bundles) {
+  return db_select('vote', 'v')
+    ->condition('pool', $bundles)
+    ->condition('entity_type', $item->entity_type)
+    ->condition('entity_id', $item->entity_id)
+    ->countQuery()
+    ->execute()
+    ->fetchField();
+}
+
+/**
+ * Calculates the average vote value.
+ *
+ * @return
+ *   An integer representing the average vote value for this constellation.
+ */
+function vote_defaults_function_average($item, $function, $bundles) {
+  $query = db_select('vote', 'v')
+    ->condition('pool', $bundles)
+    ->condition('entity_type', $item->entity_type)
+    ->condition('entity_id', $item->entity_id);
+  
+  $query->addExpression('AVG(value)');
+
+  return $query->execute()->fetchField();
+}
+
+/**
+ * Calculates the sum of vote values.
+ *
+ * @return
+ *   An integer representing the sum of vote values in this constellation.
+ */
+function vote_defaults_function_sum($item, $function, $bundles) {
+  $query = db_select('vote', 'v')
+    ->condition('pool', $bundles)
+    ->condition('entity_type', $item->entity_type)
+    ->condition('entity_id', $item->entity_id);
+
+  $query->addExpression('SUM(value)');
+
+  return $query->execute()->fetchField();
+}
+
+/**
+ * Calculates the score for each value.
+ *
+ * @return
+ *   An array of values representing the score of each value (delta).
+ */
+function vote_defaults_function_score($item, $function, $bundles) {
+  $query = db_select('vote', 'v')
+    ->fields('v', array('value'))
+    ->condition('pool', $bundles)
+    ->condition('entity_type', $item->entity_type)
+    ->condition('entity_id', $item->entity_id)
+    ->groupBy('value');
+
+  $query->addExpression('COUNT(*)');
+
+  return $query->execute()->fetchAllKeyed();
+}

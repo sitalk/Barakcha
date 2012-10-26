@@ -1,0 +1,13 @@
+
+#element_to_pop_up 
+{ 
+   display:none;   
+   border:1px solid blue;
+}
+
+.bClose
+{
+background:#fff;
+}
+
+

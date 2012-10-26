@@ -1,0 +1,367 @@
+<?php
+
+/**
+ * @file
+ * Provides installation and deinstallation logic for the vote module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function vote_schema() {
+  $schema['vote'] = array(
+    'description' => 'The base table for votes.',
+    'fields' => array(
+      'vid' => array(
+        'description' => 'The primary identifier for a vote.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'value' => array(
+        'description' => 'The integer value of a vote.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'default' => 0,
+      ),
+      'pool' => array(
+        'description' => 'The pool a vote belongs to.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'entity_type' => array(
+        'description' => 'The target entity type of a vote.',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+      ),
+      'entity_id' => array(
+        'description' => 'The target entity id of a vote.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+      ),
+      'uid' => array(
+        'description' => 'The {users}.uid that owns a vote. Initially, this is the user who created it.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'sid' => array(
+        'description' => 'The {session_api}.session_id that owns a vote.',
+        'type' => 'varchar',
+        'length' => 64,
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when a vote was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'changed' => array(
+        'description' => 'The Unix timestamp when a vote was most recently saved.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('vid'),
+    'indexes' => array(
+      'vote_changed' => array('changed'),
+      'vote_created' => array('created'),
+      'vote_pool' => array('pool'),
+      'vote_target' => array('entity_type', 'entity_id'),
+      'vote_constellation' => array('pool', 'entity_type', 'entity_id'),
+      'uid' => array('uid'),
+    ),
+  );
+  
+  $schema['vote_result'] = array(
+    'description' => 'The base table for vote results.',
+    'fields' => array(
+      'rid' => array(
+        'description' => 'The primary identifier for a result.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'result' => array(
+        'description' => 'The result value.',
+        'type' => 'float',
+        'size' => 'big',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'delta' => array(
+        'description' => 'The delta of a result value. This is required for vote result functions with multiple result values.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'function' => array(
+        'description' => 'The machine-readable name of a result function.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'bundle' => array(
+        'description' => 'The pool or aggregate a vote result belongs to.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'aggregate' => array(
+        'description' => 'A boolean indicating whether {vote_result}.group is an aggregate or a pool.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+      ),
+      'entity_type' => array(
+        'description' => 'The target entity type of a result.',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+      ),
+      'entity_id' => array(
+        'description' => 'The target entity id of a result.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+      ),
+      'timestamp' => array(
+        'description' => 'The Unix timestamp when a result was calculated.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('rid'),
+    'unique keys' => array(
+      'identifier' => array('function', 'delta', 'bundle', 'aggregate', 'entity_type', 'entity_id'),
+    ),
+    'indexes' => array(
+      'vote_function' => array('function'),
+      'vote_delta' => array('function', 'delta'),
+      'vote_bundle' => array('bundle', 'aggregate'),
+      'vote_target' => array('entity_type', 'entity_id'),
+      'vote_constellation' => array('bundle', 'aggregate', 'entity_type', 'entity_id'),
+      'vote_constellation_function' => array('bundle', 'aggregate', 'entity_type', 'entity_id', 'function'),
+    ),
+  );
+
+  $schema['vote_pool'] = array(
+    'description' => 'Stores information about all defined pools.',
+    'fields' => array(
+      'pool' => array(
+        'description' => 'The machine-readable name of a pool.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'description' => 'The human-readable name of a pool.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'module' => array(
+        'description' => 'The module defining a pool.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'description' => array(
+        'description' => 'A brief description of a pool.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'medium',
+      ),
+      'type' => array(
+        'description' => 'The value type of a pool.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'settings' => array(
+        'description' => 'A serialized array of settings for a pool.',
+        'type' => 'blob',
+        'not null' => TRUE,
+        'serialize' => TRUE,
+      ),
+      'custom' => array(
+        'description' => 'A boolean indicating whether a pool is defined by a module (FALSE) or by a user via Add pool (TRUE).',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+      ),
+      'modified' => array(
+        'description' => 'A boolean indicating whether an aggregate has been modified.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+      ),
+      'locked' => array(
+        'description' => 'A boolean indicating whether an aggregate is locked.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+      ),
+      'disabled' => array(
+        'description' => 'A boolean indicating whether a pool is disabled.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+      ),
+    ),
+    'primary key' => array('pool'),
+  );
+
+  $schema['vote_aggregate'] = array(
+    'description' => 'Stores information about all defined aggregates.',
+    'fields' => array(
+      'aggregate' => array(
+        'description' => 'The machine-readable name of an aggregate.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'description' => 'The human-readable name of an aggregate.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'module' => array(
+        'description' => 'The module defining a voting pool.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'description' => array(
+        'description' => 'A brief description of a voting pool.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'medium',
+      ),
+      'type' => array(
+        'description' => 'The value type of a voting pool.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'settings' => array(
+        'description' => 'A serialized array of settings for an aggregate.',
+        'type' => 'blob',
+        'not null' => TRUE,
+        'serialize' => TRUE,
+      ),
+      'custom' => array(
+        'description' => 'A boolean indicating whether an aggregate is defined by a module (FALSE) or by a user via Add aggregate (TRUE).',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+      ),
+      'modified' => array(
+        'description' => 'A boolean indicating whether an aggregate has been modified.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+      ),
+      'locked' => array(
+        'description' => 'A boolean indicating whether an aggregate is locked.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+      ),
+      'disabled' => array(
+        'description' => 'A boolean indicating whether an aggregate is disabled.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+      ),
+    ),
+    'primary key' => array('aggregate'),
+  );
+
+  $schema['vote_queue'] = array(
+    'description' => 'Queues voting constellations for recalculation.',
+    'fields' => array(
+      'qid' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'bundle' => array(
+        'description' => 'The machine-readable name of the pool or aggregate in a queued constellation.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'aggregate' => array(
+        'description' => 'A boolean indicating whether {vote_queue}.group is an aggregate or a pool.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+      ),
+      'entity_type' => array(
+        'description' => 'The entity type in a queued constellation.',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+      ),
+      'entity_id' => array(
+        'description' => 'The entity id in a queued constellation.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when a constellation was queued.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'expire' => array(
+        'description' => 'The Unix timestamp when a queue constellation expires.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('qid'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function vote_install() {
+  variable_set('queue_class_vote_queue', 'VoteRecalculationQueue');
+  variable_set('queue_class_vote_static_queue', 'VoteRecalculationStaticQueue');
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function vote_uninstall() {
+  variable_del('queue_class_vote_queue');
+  variable_del('queue_class_vote_static_queue');
+}
